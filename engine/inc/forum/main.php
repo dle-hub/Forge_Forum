@@ -74,6 +74,179 @@ if (!function_exists("forum_plain_text_snippet")) {
     }
 }
 
+// SÜRÜM KONTROLÜ (Sistem Bilgisi)
+// -------------------------------------------------
+if (!function_exists("forum_normalize_upgrade_url")) {
+    function forum_normalize_upgrade_url($url)
+    {
+        $url = trim(str_replace("&amp;", "&", (string) $url));
+        if ($url === "") {
+            return "";
+        }
+
+        // github.com/.../blob/branch/file.json → raw.githubusercontent.com
+        if (preg_match(
+            '#^https?://github\.com/([^/]+)/([^/]+)/blob/([^/]+)/(.+)$#i',
+            $url,
+            $m,
+        )) {
+            return "https://raw.githubusercontent.com/{$m[1]}/{$m[2]}/{$m[3]}/{$m[4]}";
+        }
+
+        return $url;
+    }
+}
+
+if (!function_exists("forum_http_get")) {
+    function forum_http_get($url)
+    {
+        if (function_exists("curl_init")) {
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, 0);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+            curl_setopt(
+                $ch,
+                CURLOPT_USERAGENT,
+                "Forge-Forum-Update-Check/1.0",
+            );
+            $data = curl_exec($ch);
+            curl_close($ch);
+
+            if ($data !== false && $data !== "") {
+                return $data;
+            }
+        }
+
+        if (preg_match("/1|yes|on|true/i", ini_get("allow_url_fopen"))) {
+            $ctx = stream_context_create([
+                "http" => [
+                    "timeout" => 15,
+                    "header" => "User-Agent: Forge-Forum-Update-Check/1.0\r\n",
+                ],
+                "ssl" => [
+                    "verify_peer" => false,
+                    "verify_peer_name" => false,
+                ],
+            ]);
+            $data = @file_get_contents($url, false, $ctx);
+            if ($data !== false && $data !== "") {
+                return $data;
+            }
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists("forum_release_mirror_urls")) {
+    function forum_release_mirror_urls($url)
+    {
+        $url = forum_normalize_upgrade_url($url);
+        $urls = [];
+
+        if ($url !== "") {
+            $urls[] = $url;
+        }
+
+        if (
+            preg_match(
+                '#raw\.githubusercontent\.com/([^/]+)/([^/]+)/([^/]+)/(.+)$#i',
+                $url,
+                $m,
+            )
+        ) {
+            $urls[] =
+                "https://cdn.jsdelivr.net/gh/{$m[1]}/{$m[2]}@{$m[3]}/{$m[4]}";
+        }
+
+        return array_values(array_unique($urls));
+    }
+}
+
+if (!function_exists("forum_fetch_release_json")) {
+    function forum_fetch_release_json($url)
+    {
+        $cache_bust = "t=" . time();
+        foreach (forum_release_mirror_urls($url) as $mirror) {
+            $fetch_url =
+                $mirror .
+                (strpos($mirror, "?") === false ? "?" : "&") .
+                $cache_bust;
+            $data = forum_http_get($fetch_url);
+            if ($data !== false && $data !== "") {
+                return $data;
+            }
+        }
+
+        return false;
+    }
+}
+
+$forum_version = "1.0.0";
+$forum_plugin_name = "";
+$forum_upgrade_url =
+    "https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json";
+$forum_update = [
+    "available" => false,
+    "version" => "",
+    "remote_version" => "",
+    "url" => "",
+    "checked" => false,
+    "error" => "",
+];
+
+$plugin_info = $db->super_query(
+    "SELECT name, version, upgradeurl FROM " .
+        PREFIX .
+        "_plugins WHERE name='Forge Forum' LIMIT 1",
+);
+if (!$plugin_info) {
+    $plugin_info = $db->super_query(
+        "SELECT name, version, upgradeurl FROM " .
+            PREFIX .
+            "_plugins WHERE upgradeurl LIKE '%Forge_Forum%release.json%' LIMIT 1",
+    );
+}
+if ($plugin_info) {
+    $forum_plugin_name = trim($plugin_info["name"] ?? "");
+    if (!empty($plugin_info["version"])) {
+        $forum_version = trim($plugin_info["version"]);
+    }
+    if (!empty($plugin_info["upgradeurl"])) {
+        $forum_upgrade_url = forum_normalize_upgrade_url(
+            $plugin_info["upgradeurl"],
+        );
+    }
+}
+
+$remote_data = forum_fetch_release_json($forum_upgrade_url);
+if ($remote_data) {
+    $remote = json_decode(trim($remote_data), true);
+    if (is_array($remote) && !empty($remote["version"])) {
+        $forum_update["checked"] = true;
+        $forum_update["remote_version"] = trim($remote["version"]);
+        if (
+            version_compare(
+                $forum_update["remote_version"],
+                $forum_version,
+                ">",
+            )
+        ) {
+            $forum_update["available"] = true;
+            $forum_update["version"] = $forum_update["remote_version"];
+            $forum_update["url"] = trim($remote["url"] ?? "");
+        }
+    } else {
+        $forum_update["error"] = "invalid_json";
+    }
+} else {
+    $forum_update["error"] = "fetch_failed";
+}
+
 // İSTATİSTİKLERİ ÇEK
 // -------------------------------------------------
 $stats = [];
@@ -479,7 +652,41 @@ $forum_stat_sub_style = "font-size:10px; margin-top:4px; opacity:0.75;";
                     <tbody>
                         <tr style="border-bottom:1px solid #f3f4f6;">
                             <td style="padding:12px 20px;"><strong><?php echo $lang['forum_main_plugin_ver']; ?></strong></td>
-                            <td class="text-right" style="padding:12px 20px;"><span class="label label-info" style="font-weight:600; padding:3px 8px; border-radius:3px; background-color:#3b82f6; color:#fff;">v2.0</span></td>
+                            <td class="text-right" style="padding:12px 20px;">
+                                <span class="label label-info" style="font-weight:600; padding:3px 8px; border-radius:3px; background-color:#3b82f6; color:#fff;">v<?php echo htmlspecialchars($forum_version, ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php if ($forum_plugin_name): ?>
+                                    <span class="text-muted" style="font-size:10px; display:block; margin-top:4px;"><?php echo sprintf($lang['forum_main_update_db_note'], htmlspecialchars($forum_plugin_name, ENT_QUOTES, 'UTF-8')); ?></span>
+                                <?php else: ?>
+                                    <span class="text-danger" style="font-size:10px; display:block; margin-top:4px;"><?php echo $lang['forum_main_update_db_missing']; ?></span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #f3f4f6;">
+                            <td style="padding:12px 20px;"><strong><?php echo $lang['forum_main_update_remote_label']; ?></strong></td>
+                            <td class="text-right" style="padding:12px 20px;">
+                                <?php if ($forum_update['checked'] && !empty($forum_update['remote_version'])): ?>
+                                    <span class="label label-default" style="font-weight:600; padding:3px 8px; border-radius:3px;">v<?php echo htmlspecialchars($forum_update['remote_version'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted" style="font-size:12px;">—</span>
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #f3f4f6;">
+                            <td style="padding:12px 20px;"><strong><?php echo $lang['forum_main_update_status']; ?></strong></td>
+                            <td class="text-right" style="padding:12px 20px;">
+                                <?php if ($forum_update['available']): ?>
+                                    <span class="label label-warning" style="font-weight:600; padding:3px 8px; border-radius:3px;">v<?php echo htmlspecialchars($forum_update['version'], ENT_QUOTES, 'UTF-8'); ?></span>
+                                    <?php if (!empty($forum_update['url'])): ?>
+                                        <a href="<?php echo htmlspecialchars($forum_update['url'], ENT_QUOTES, 'UTF-8'); ?>" target="_blank" rel="noopener" class="text-primary" style="margin-left:8px; font-size:11px;"><?php echo $lang['forum_main_update_download']; ?></a>
+                                    <?php endif; ?>
+                                <?php elseif ($forum_update['checked']): ?>
+                                    <span class="text-success" style="font-size:12px;"><i class="fa fa-check-circle"></i> <?php echo $lang['forum_main_update_current']; ?></span>
+                                <?php else: ?>
+                                    <span class="text-muted" style="font-size:12px;"><?php echo $lang['forum_main_update_check_failed']; ?></span>
+                                    <span class="text-muted" style="font-size:10px; display:block; margin-top:4px;"><?php echo $lang['forum_main_update_check_hint']; ?></span>
+                                <?php endif; ?>
+                                <a href="?mod=forum&amp;action=main&amp;recheck=1" class="text-primary" style="font-size:10px; display:block; margin-top:6px;"><?php echo $lang['forum_main_update_recheck']; ?></a>
+                            </td>
                         </tr>
                         <tr style="border-bottom:1px solid #f3f4f6;">
                             <td style="padding:12px 20px;"><strong><?php echo $lang['forum_main_dle_ver']; ?></strong></td>

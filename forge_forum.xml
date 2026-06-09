@@ -4,10 +4,10 @@
 	<description
     >Modüler Admin Panelli, OOP, AJAX, SEO Uyumlu Forum Sistemi</description>
 	<icon>public/adminpanel/images/forum.png</icon>
-	<version>1.0</version>
+	<version>1.0.0</version>
 	<dleversion>19.1</dleversion>
 	<versioncompare />
-	<upgradeurl />
+	<upgradeurl>https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json</upgradeurl>
 	<filedelete>0</filedelete>
 	<needplugin />
 	<mnotice>0</mnotice>
@@ -496,7 +496,8 @@ DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldelete>
         DLEUrl::$rules = array_merge($custom_rules, $other_rules);
         DLEUrl::SaveRules(DLEUrl::$rules);
     }
-}]]></phpupgrade>
+}
+$db->query("UPDATE " . PREFIX . "_plugins SET upgradeurl='https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json' WHERE name='Forge Forum'");]]></phpupgrade>
 	<phpenable
     ><![CDATA[if (class_exists('DLEUrl')) {
     $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id'];
