@@ -1,0 +1,47 @@
+# ============================================================
+# Forge Forum Engine — URL Kuralları (REFERANS)
+# ============================================================
+#
+# BİRİNCİL KAYNAK: forge_forum.xml
+#   phpinstall / phpupgrade / phpenable bölümlerindeki
+#   DLEUrl::AddRule(...) tanımları.
+#
+# allow_alt_url aktif DLE sitelerinde bu dosyayı .htaccess'e
+# EKLEMEYİN — DLEUrl kurallarıyla çakışır ve çalışmaz.
+#
+# Aşağıdaki RewriteRule satırları yalnızca allow_alt_url KAPALI
+# legacy kurulumlar için referanstır (genelde kullanılmaz).
+# ============================================================
+
+# Forum Ana Sayfa
+# RewriteRule ^forum/?$ index.php?do=forum [L]
+
+# Forum Kategorisi: /forum/kategori-adi/
+# RewriteRule ^forum/([^/]+)/?$ index.php?do=forum&action=category&cat=$1 [L]
+
+# Forum Kategorisi Sayfalama: /forum/kategori-adi/page/2/
+# RewriteRule ^forum/([^/]+)/page/([0-9]+)/?$ index.php?do=forum&action=category&cat=$1&page=$2 [L]
+
+# Konu (alt_name): /forum/konu-adi.html
+# RewriteRule ^forum/([^/]+)\.html$ index.php?do=forum&action=topic&alt_name=$1 [L]
+
+# Konu ID ile: /forum/topic/123-konu-adi.html
+# RewriteRule ^forum/topic/([0-9]+)-.*\.html$ index.php?do=forum&action=topic&topic_id=$1 [L,QSA]
+
+# Konu (sondaki slash — Son Mesaj): /forum/topic/123-konu-adi/
+# RewriteRule ^forum/topic/([0-9]+)-[^/]+/?$ index.php?do=forum&action=topic&topic_id=$1 [L,QSA]
+
+# Konu Sayfalama: /forum/topic/123-konu-adi/page/2/
+# RewriteRule ^forum/topic/([0-9]+)-.*/page/([0-9]+)/?$ index.php?do=forum&action=topic&topic_id=$1&page=$2 [L]
+
+# Yeni Konu: /forum/new-topic/
+# RewriteRule ^forum/new-topic/?$ index.php?do=forum&action=new_topic [L]
+
+# Yeni Konu (kategori seçili): /forum/new-topic/kategori-adi/
+# RewriteRule ^forum/new-topic/([^/]+)/?$ index.php?do=forum&action=new_topic&cat=$1 [L]
+
+# Profil: /forum/user/username/
+# RewriteRule ^forum/user/([^/]+)/?$ index.php?do=forum&action=profile&user=$1 [L]
+
+# Arama: /forum/search/
+# RewriteRule ^forum/search/?$ index.php?do=forum&action=search [L]
