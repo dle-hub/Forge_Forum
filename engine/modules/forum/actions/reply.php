@@ -171,7 +171,7 @@ if (isset($_POST["submit_reply"])) {
     }
 
     // Link uploads made during reply creation to the newly created post
-    $db->query("UPDATE " . PREFIX . "_forum_uploads SET post_id = '{$new_post_id}' WHERE user_id = '{$uid}' AND post_id = 0 AND date >= NOW() - INTERVAL 2 HOUR");
+    forum_link_pending_uploads($new_post_id, $uid);
 
     // Mention etiketlerini işle ve bildirim gönder
     forum_parse_mentions($post_text, $tid, $new_post_id, $uid);
