@@ -195,6 +195,21 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_attachments` (
   KEY `user_id` (`user_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_uploads` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `post_id` int(11) NOT NULL DEFAULT '0',
+  `filename` varchar(255) NOT NULL,
+  `filepath` varchar(255) NOT NULL,
+  `filesize` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  `driver` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `post_id` (`post_id`),
+  KEY `date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `{prefix}_forum_prefixes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
@@ -404,7 +419,22 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_promotions` (
   `from_group` int(11) DEFAULT '0',
   `to_group` int(11) NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;]]></mysqlupgrade>
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_uploads` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `post_id` int(11) NOT NULL DEFAULT '0',
+  `filename` varchar(255) NOT NULL,
+  `filepath` varchar(255) NOT NULL,
+  `filesize` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  `driver` int(11) NOT NULL DEFAULT '0',
+  PRIMARY KEY (`id`),
+  KEY `user_id` (`user_id`),
+  KEY `post_id` (`post_id`),
+  KEY `date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;]]></mysqlupgrade>
 	<mysqlenable
     ><![CDATA[INSERT IGNORE INTO `{prefix}_admin_sections` (`name`, `title`, `descr`, `icon`, `allow_groups`) VALUES ('forum', 'Forum Yönetimi', 'Forge Forum', 'forum.png', '1,2');]]></mysqlenable>
 	<mysqldisable
@@ -419,6 +449,7 @@ DROP TABLE IF EXISTS `{prefix}_forum_poll_options`;
 DROP TABLE IF EXISTS `{prefix}_forum_polls`;
 DROP TABLE IF EXISTS `{prefix}_forum_flood`;
 DROP TABLE IF EXISTS `{prefix}_forum_prefixes`;
+DROP TABLE IF EXISTS `{prefix}_forum_uploads`;
 DROP TABLE IF EXISTS `{prefix}_forum_attachments`;
 DROP TABLE IF EXISTS `{prefix}_forum_banned_words`;
 DROP TABLE IF EXISTS `{prefix}_forum_settings`;

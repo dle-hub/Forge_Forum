@@ -92,31 +92,9 @@ if (!$_fup_logged) {
 }
 $is_logged = $_fup_logged;
 
-// 2. Veritabanı Tablosu Otomatik Oluşturma ve Sütun Kontrolleri (Failsafe)
-$db->query("CREATE TABLE IF NOT EXISTS " . PREFIX . "_forum_uploads (
-    id INT(11) NOT NULL AUTO_INCREMENT,
-    user_id INT(11) NOT NULL,
-    post_id INT(11) NOT NULL DEFAULT 0,
-    filename VARCHAR(255) NOT NULL,
-    filepath VARCHAR(255) NOT NULL,
-    filesize INT(11) NOT NULL,
-    date DATETIME NOT NULL,
-    driver INT(11) NOT NULL DEFAULT 0,
-    PRIMARY KEY (id),
-    KEY user_id (user_id),
-    KEY post_id (post_id),
-    KEY date (date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;");
-
-$check_column = $db->super_query("SHOW COLUMNS FROM " . PREFIX . "_forum_uploads LIKE 'post_id'");
-if (!$check_column) {
-    $db->query("ALTER TABLE " . PREFIX . "_forum_uploads ADD post_id INT(11) NOT NULL DEFAULT 0 AFTER user_id, ADD INDEX (post_id)");
-}
-
-$check_driver = $db->super_query("SHOW COLUMNS FROM " . PREFIX . "_forum_uploads LIKE 'driver'");
-if (!$check_driver) {
-    $db->query("ALTER TABLE " . PREFIX . "_forum_uploads ADD driver INT(11) NOT NULL DEFAULT 0");
-}
+// 2. Veritabanı tablosu (kurulumda da oluşturulur; dosya yüklenmeden mesaj atılırsa failsafe)
+include_once DLEPlugins::Check(ENGINE_DIR . "/modules/forum/editor_helpers.php");
+forum_ensure_uploads_table();
 
 // 3. Forum Ayarlarını Çek
 $forum_cfg = [];
