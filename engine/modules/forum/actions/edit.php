@@ -40,17 +40,28 @@ $tid = intval( $post['topic_id'] );
 $first_post = $db->super_query("SELECT id FROM " . PREFIX . "_forum_posts WHERE topic_id = '{$tid}' ORDER BY id ASC LIMIT 1");
 $is_first_post = (intval($first_post['id']) === intval($post_id));
 
-// Yetki: mesaj sahibi VEYA admin/mod/editör
+// Yetki: mesaj sahibi, admin/mod veya kategori moderatörü
 $is_owner = ( intval($post['user_id']) === intval($member_id['user_id']) );
-$is_mod   = ( $member_id['user_group'] <= 3 ); // Yönetici (1), Moderatör (2) ve Editör (3) tam yetkili
+$is_mod   = ( intval($member_id['user_group']) <= 2 ); // Yönetici (1) ve Moderatör (2) tam yetkili
+$is_cat_mod = false;
+if ( !$is_mod && $is_logged && !empty($forum_cfg['enable_topic_edit_mods']) && function_exists('forum_user_is_cat_mod') ) {
+    $is_cat_mod = forum_user_is_cat_mod( intval($member_id['user_id']), intval($post['topic_cat_id']) );
+}
+$can_mod_edit = $is_mod || $is_cat_mod;
 
-if( !$is_owner && !$is_mod ) {
-    msgbox( $lang['forum_access_denied'], $lang['forum_edit_no_perm'] );
-    return;
+if ( !$can_mod_edit ) {
+    if ( !$is_owner ) {
+        msgbox( $lang['forum_access_denied'], $lang['forum_edit_no_perm'] );
+        return;
+    }
+    if ( $is_first_post && empty($forum_cfg['enable_topic_edit_owner']) ) {
+        msgbox( $lang['forum_access_denied'], $lang['forum_edit_no_perm'] );
+        return;
+    }
 }
 
-// Zaman sınırı (sadece mesaj sahibi için, mod/admin/editör sınırsız, konunun ana mesajı/başlığı için de sınırsız)
-if( $is_owner && !$is_mod && !$is_first_post ) {
+// Zaman sınırı (sadece mesaj sahibi için; mod/kategori modu sınırsız, konunun ana mesajı/başlığı için de sınırsız)
+if( $is_owner && !$can_mod_edit && !$is_first_post ) {
     $edit_limit = 15; // normal cevaplar için 15 dakika düzenleme sınırı
     $post_time  = strtotime( $post['date'] );
     $elapsed    = ( time() - $post_time ) / 60;
@@ -65,23 +76,24 @@ if( $is_owner && !$is_mod && !$is_first_post ) {
 // -------------------------------------------------
 if( isset( $_POST['submit_edit'] ) ) {
 
-    if( $_POST['user_hash'] !== $dle_login_hash ) {
+    if( !isset( $_POST['user_hash'] ) || $_POST['user_hash'] !== $dle_login_hash ) {
         msgbox( $lang['forum_err_title'], $lang['forum_edit_csrf'] );
         return;
     }
 
-    $new_text = trim( $_POST['text'] );
+    $new_text = trim( $_POST['text'] ?? '' );
     if( empty( $new_text ) ) {
         msgbox( $lang['forum_err_title'], $lang['forum_edit_empty_text'] );
         return;
     }
 
-    // Guvenlik: DLE'nin kendi strip_tags'i gibi temizle
-    // HTMLPurifier'a gerek yok, DLE kendi parse mekanizmasini kullanir
-    // HTML icerigi DB'ye kaydedilirken db->safesql() zaten SQL injection'i engeller
-    // Sadece fazladan script taglarini temizle
-    $new_text = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $new_text);
-    $new_text = preg_replace('/<\s*on\w+\s*=\s*["\'][^"\']*["\']/i', '', $new_text);
+    // Guvenlik: Editor icerigini whitelist tabanli HTMLPurifier ile temizle (XSS korumasi)
+    // (yeni konu/cevap kayit yolu ile ayni allow-list)
+    if (!empty($forum_cfg["editor_enabled"])) {
+        $new_text = forum_sanitize_html($new_text);
+    } else {
+        $new_text = strip_tags($new_text);
+    }
 
     $safe_text = $db->safesql( $new_text );
     $uid       = intval( $member_id['user_id'] );
@@ -105,9 +117,10 @@ if( isset( $_POST['submit_edit'] ) ) {
     // Eğer konunun ilk mesajı ise, başlık, önek, kategori ve etiketleri de güncelle
     $topic_alt = $post['topic_alt'];
     if ($is_first_post) {
-        $new_title = trim($_POST['title']);
-        $new_cat_id = intval($_POST['cat_id']);
-        $new_prefix_id = intval($_POST['prefix_id']);
+        $new_title = trim($_POST['title'] ?? '');
+        // Kategori değişikliği yalnızca yönetici/moderatör ve kategori moderatörüne açıktır
+        $new_cat_id = $can_mod_edit ? intval($_POST['cat_id'] ?? 0) : intval($post['topic_cat_id']);
+        $new_prefix_id = intval($_POST['prefix_id'] ?? 0);
         
         if (empty($new_title)) {
             msgbox($lang['forum_err_title'], $lang['forum_edit_empty_title']);
@@ -116,6 +129,10 @@ if( isset( $_POST['submit_edit'] ) ) {
         if (!$new_cat_id) {
             msgbox($lang['forum_err_title'], $lang['forum_edit_invalid_cat']);
             return;
+        }
+        $cat_check = $db->super_query("SELECT id FROM " . PREFIX . "_forum_cats WHERE id='{$new_cat_id}'");
+        if (empty($cat_check['id'])) {
+            $new_cat_id = intval($post['topic_cat_id']);
         }
         
         $safe_title = $db->safesql($new_title);
@@ -142,7 +159,7 @@ if( isset( $_POST['submit_edit'] ) ) {
             $db->query("DELETE FROM " . PREFIX . "_forum_tags WHERE topic_count <= 0");
         }
         
-        $tags_str = trim($_POST['tags']);
+        $tags_str = trim($_POST['tags'] ?? '');
         if (!empty($tags_str)) {
             $tags_arr = explode(',', $tags_str);
             foreach ($tags_arr as $tname) {
@@ -169,45 +186,69 @@ if( isset( $_POST['submit_edit'] ) ) {
         }
 
         // Anket güncelleme veya ekleme (Poll update or insert)
-        $poll_question = trim($_POST['poll_question']);
-        $poll_options_str = trim($_POST['poll_options']);
+        // NOT: Mevcut seçenekler silinip yeniden oluşturulmaz; oylar korunur.
+        $poll_question = trim($_POST['poll_question'] ?? '');
+        $poll_options_str = trim($_POST['poll_options'] ?? '');
         $existing_poll = $db->super_query("SELECT id FROM " . PREFIX . "_forum_polls WHERE topic_id = '{$tid}'");
         
         if (!empty($poll_question) && !empty($poll_options_str)) {
             $poll_multiple = isset($_POST['poll_multiple']) ? 1 : 0;
-            $poll_max_choices = intval($_POST['poll_max_choices']);
-            $poll_days = intval($_POST['poll_days']);
+            $poll_max_choices = max(1, intval($_POST['poll_max_choices'] ?? 1));
+            $poll_days = intval($_POST['poll_days'] ?? 0);
             $end_date = "NULL";
             if ($poll_days > 0) {
                 $end_date = "'" . date('Y-m-d H:i:s', time() + $poll_days * 86400) . "'";
             }
             $safe_question = $db->safesql($poll_question);
+
+            $options_arr = preg_split('/\r\n|\r|\n/', $poll_options_str);
+            $options_arr = array_values(array_filter(array_map('trim', $options_arr), function ($v) {
+                return $v !== '';
+            }));
             
-            if ($existing_poll['id']) {
+            if (!empty($existing_poll['id'])) {
                 $poll_id = intval($existing_poll['id']);
+                $max_choices_safe = max(1, min($poll_max_choices, max(1, count($options_arr))));
                 $db->query("UPDATE " . PREFIX . "_forum_polls SET
                     question = '{$safe_question}',
                     multiple = '{$poll_multiple}',
-                    max_choices = '{$poll_max_choices}',
+                    max_choices = '{$max_choices_safe}',
                     end_date = {$end_date}
                     WHERE id = '{$poll_id}'");
-                    
-                // Seçenekleri yenile
-                $db->query("DELETE FROM " . PREFIX . "_forum_poll_options WHERE poll_id = '{$poll_id}'");
-                $options_arr = explode("\n", $poll_options_str);
-                $posi = 0;
-                foreach ($options_arr as $opt) {
-                    $opt = trim($opt);
-                    if (empty($opt)) continue;
+
+                // Mevcut seçenekleri önce topla (döngü içindeki INSERT query_id'yi ezmesin)
+                $existing_options = [];
+                $db->query("SELECT id, votes FROM " . PREFIX . "_forum_poll_options WHERE poll_id = '{$poll_id}' ORDER BY posi ASC, id ASC");
+                while ($eo = $db->get_row()) {
+                    $existing_options[] = $eo;
+                }
+
+                foreach ($options_arr as $i => $opt) {
                     $safe_opt = $db->safesql($opt);
-                    $db->query("INSERT INTO " . PREFIX . "_forum_poll_options (poll_id, text, votes, posi) 
-                                VALUES ('{$poll_id}', '{$safe_opt}', 0, '{$posi}')");
-                    $posi++;
+                    if (isset($existing_options[$i])) {
+                        $oid = intval($existing_options[$i]['id']);
+                        $db->query("UPDATE " . PREFIX . "_forum_poll_options SET text = '{$safe_opt}', posi = '{$i}' WHERE id = '{$oid}'");
+                    } else {
+                        $db->query("INSERT INTO " . PREFIX . "_forum_poll_options (poll_id, text, votes, posi) 
+                                    VALUES ('{$poll_id}', '{$safe_opt}', 0, '{$i}')");
+                    }
+                }
+
+                // Fazla seçenekler: yalnızca oy almamış olanlar silinir
+                for ($i = count($options_arr); $i < count($existing_options); $i++) {
+                    $oid = intval($existing_options[$i]['id']);
+                    if (intval($existing_options[$i]['votes']) === 0) {
+                        $db->query("DELETE FROM " . PREFIX . "_forum_poll_votes WHERE poll_id = '{$poll_id}' AND option_id = '{$oid}'");
+                        $db->query("DELETE FROM " . PREFIX . "_forum_poll_options WHERE id = '{$oid}'");
+                    } else {
+                        $db->query("UPDATE " . PREFIX . "_forum_poll_options SET posi = '{$i}' WHERE id = '{$oid}'");
+                    }
                 }
             } else {
                 // Yeni anket ekle
+                $max_choices_safe = max(1, min($poll_max_choices, max(1, count($options_arr))));
                 $db->query("INSERT INTO " . PREFIX . "_forum_polls (topic_id, question, multiple, max_choices, end_date) 
-                            VALUES ('{$tid}', '{$safe_question}', '{$poll_multiple}', '{$poll_max_choices}', {$end_date})");
+                            VALUES ('{$tid}', '{$safe_question}', '{$poll_multiple}', '{$max_choices_safe}', {$end_date})");
                 $poll_id = $db->insert_id();
                 if (!$poll_id) {
                     $get_poll = $db->super_query("SELECT id FROM " . PREFIX . "_forum_polls WHERE topic_id = '{$tid}'");
@@ -215,19 +256,14 @@ if( isset( $_POST['submit_edit'] ) ) {
                 }
                 
                 if ($poll_id > 0) {
-                    $options_arr = explode("\n", $poll_options_str);
-                    $posi = 0;
-                    foreach ($options_arr as $opt) {
-                        $opt = trim($opt);
-                        if (empty($opt)) continue;
+                    foreach ($options_arr as $i => $opt) {
                         $safe_opt = $db->safesql($opt);
                         $db->query("INSERT INTO " . PREFIX . "_forum_poll_options (poll_id, text, votes, posi) 
-                                    VALUES ('{$poll_id}', '{$safe_opt}', 0, '{$posi}')");
-                        $posi++;
+                                    VALUES ('{$poll_id}', '{$safe_opt}', 0, '{$i}')");
                     }
                 }
             }
-        } elseif ($existing_poll['id']) {
+        } elseif (!empty($existing_poll['id'])) {
             // Anketi tamamen sil (Eğer alanlar boşaltıldıysa)
             $poll_id = intval($existing_poll['id']);
             $db->query("DELETE FROM " . PREFIX . "_forum_polls WHERE id = '{$poll_id}'");
@@ -262,7 +298,8 @@ if ($forum_cfg["editor_enabled"]) {
     $f_editor_news_id = $post_id;
     include_once DLEPlugins::Check(ENGINE_DIR . "/editor/forum.php");
     
-    $post_val = forum_prepare_editor_content($post["text"]);
+    // textarea'ya gomulen HTML, </textarea> breakout XSS'ine karsi escape edilmeli
+    $post_val = htmlspecialchars(forum_prepare_editor_content($post["text"]), ENT_QUOTES, "UTF-8");
     
     $wysiwyg = str_replace('></textarea>', '>' . $post_val . '</textarea>', $wysiwyg);
     $tpl->set("{forum_editor}", $wysiwyg);
@@ -277,9 +314,10 @@ if ($forum_cfg["editor_enabled"]) {
 
 $metatags['title'] = sprintf($lang['forum_edit_title'], $forum_title);
 $tpl->load_template( 'forum/edit.tpl' );
+forum_set_ui_lang($tpl, $lang);
 $tpl->set( '{post_id}', $post_id );
 $tpl->set( '{topic_id}', $tid );
-$tpl->set( '{post_text}', htmlspecialchars($post['text'], ENT_QUOTES, 'UTF-8') );
+$tpl->set( '{post_text}', htmlspecialchars(stripslashes($post['text']), ENT_QUOTES, 'UTF-8') );
 $tpl->set( '{topic_title}', htmlspecialchars( stripslashes( $post['topic_title'] ), ENT_QUOTES, 'UTF-8' ) );
 $tpl->set( '{dle_login_hash}', $dle_login_hash );
 $tpl->set( '{http_home_url}', $config['http_home_url'] );
@@ -287,6 +325,14 @@ $tpl->set( '{http_home_url}', $config['http_home_url'] );
 // İlk mesaj için özel alanlar
 if ($is_first_post) {
     $tpl->set_block("'\\[first_post\\](.*?)\\[/first_post\\]'si", "\\1");
+
+    // Kategori değiştirme yalnızca moderasyon yetkisi olanlara açık
+    if ($can_mod_edit) {
+        $tpl->set("[can-move-topic]", "");
+        $tpl->set("[/can-move-topic]", "");
+    } else {
+        $tpl->set_block("'\\[can-move-topic\\](.*?)\\[/can-move-topic\\]'si", "");
+    }
     
     // Kategori Seçici (Tüm Kategori ve Alt Forum Ağacı)
     $categories = [];
@@ -312,7 +358,7 @@ if ($is_first_post) {
             }
         }
     }
-    $tpl->set('{category_selector}', '<select name="cat_id" class="mybb-select" required>' . $cat_opts . '</select>');
+    $tpl->set('{category_selector}', '<select name="cat_id" class="forum-select" required>' . $cat_opts . '</select>');
     
     // Önek Seçici
     $prefix_opts = '<option value="0">' . $lang['forum_edit_pfx_select'] . '</option>';
@@ -321,7 +367,7 @@ if ($is_first_post) {
         $selected = ($prow['id'] == $post['topic_prefix_id']) ? " selected" : "";
         $prefix_opts .= '<option value="' . $prow['id'] . '"' . $selected . '>' . htmlspecialchars($prow['name'], ENT_QUOTES, "UTF-8") . '</option>';
     }
-    $tpl->set('{prefix_selector}', '<select name="prefix_id" class="mybb-select" style="max-width: 150px; margin-right: 10px;">' . $prefix_opts . '</select>');
+    $tpl->set('{prefix_selector}', '<select name="prefix_id" class="forum-select" style="max-width: 150px; margin-right: 10px;">' . $prefix_opts . '</select>');
     // Etiketler
     $tag_names = [];
     $db->query("SELECT t.name FROM " . PREFIX . "_forum_tags t INNER JOIN " . PREFIX . "_forum_topic_tags tt ON tt.tag_id = t.id WHERE tt.topic_id = '{$tid}'");

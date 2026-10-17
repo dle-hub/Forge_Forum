@@ -19,7 +19,7 @@ $subaction = isset($_REQUEST['subaction']) ? totranslit($_REQUEST['subaction']) 
 
 // SIL
 if ( $subaction == 'delete' && $tag_id > 0 ) {
-    if ( $_REQUEST['dle_post_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
+    if ( $_REQUEST['user_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
     $db->query( "DELETE FROM " . PREFIX . "_forum_topic_tags WHERE tag_id='{$tag_id}'" );
     $db->query( "DELETE FROM " . PREFIX . "_forum_tags WHERE id='{$tag_id}'" );
     msg("success", $lang['forum_set_success_title'], $lang['forum_tag_deleted'], "?mod=forum&action=tags"); return;
@@ -27,7 +27,7 @@ if ( $subaction == 'delete' && $tag_id > 0 ) {
 
 // GÜNCELLE
 if ( isset($_POST['save_tag']) && $tag_id > 0 ) {
-    if ( $_POST['dle_post_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
+    if ( $_POST['user_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
     $name = $db->safesql(trim($_POST['tag_name']));
     $alt  = $db->safesql(totranslit(trim($_POST['tag_name'])));
     if(empty($name)){ msg("error", $lang['forum_error_title'], $lang['forum_tag_err_name']); return; }
@@ -64,7 +64,7 @@ if($pages>1){
   <div class="panel-heading"><?php echo $lang['forum_tag_edit']; ?> <strong><?php echo htmlspecialchars($edit_tag['name'],ENT_QUOTES,'UTF-8'); ?></strong></div>
   <div class="panel-body">
     <form method="post" action="?mod=forum&action=tags&tag_id=<?php echo $tag_id; ?>" class="form-horizontal">
-      <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+      <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
       <div class="form-group">
         <label class="control-label col-md-2 col-sm-3"><?php echo $lang['forum_tag_name']; ?></label>
         <div class="col-md-10 col-sm-9">
@@ -106,7 +106,7 @@ if($pages>1){
                     "href" =>
                         "?mod=forum&action=tags&tag_id=" .
                         intval($t["id"]) .
-                        "&subaction=delete&dle_post_hash=" .
+                        "&subaction=delete&user_hash=" .
                         $dle_login_hash,
                     "label" => $lang["forum_btn_delete"],
                     "icon" => "fa fa-trash-o",

@@ -30,10 +30,17 @@ while ($row = $db->get_row()) {
 }
 
 $tpl->load_template("forum/index.tpl");
+forum_set_ui_lang($tpl, $lang);
+
+// Okunmamış konu sayıları (kategori bazlı) — rozet özelliği açıksa
+$unread_map =
+    $is_logged && intval($member_id["user_id"]) > 0 && !empty($forum_cfg["enable_unread_badge"])
+        ? forum_unread_counts_map(intval($member_id["user_id"]))
+        : [];
 
 $cat_list = "";
 foreach ($categories as $cat) {
-    if ($cat["permissions"] != "all" && $is_logged) {
+    if ($cat["permissions"] != "all") {
         $allowed = explode(",", $cat["permissions"]);
         if (!in_array($member_id["user_group"], $allowed)) {
             continue;
@@ -67,13 +74,21 @@ foreach ($categories as $cat) {
 
         // 3. seviye alt forumlar
         $sub_sub_list = [];
+        $sub_sub_ids  = [];
         $db->query("SELECT * FROM " . PREFIX . "_forum_cats WHERE parent_id='{$sub["id"]}' ORDER BY posi ASC");
         while ($ss = $db->get_row()) {
             $ss_link        = $config["http_home_url"] . "forum/" . $ss["alt_name"] . "/";
             $ss_name        = htmlspecialchars($ss["name"], ENT_QUOTES, "UTF-8");
             $sub_sub_list[] = '<a href="' . $ss_link . '">' . $ss_name . '</a>';
+            $sub_sub_ids[]  = intval($ss["id"]);
         }
         $sub_subs = implode(", ", $sub_sub_list);
+
+        // Alt forum okunmamış konu sayısı (kendisi + 3. seviye çocukları)
+        $sub_unread = intval($unread_map[intval($sub["id"])] ?? 0);
+        foreach ($sub_sub_ids as $ssid) {
+            $sub_unread += intval($unread_map[$ssid] ?? 0);
+        }
 
         // Son mesaj bilgisi
         $lp = null;
@@ -107,9 +122,9 @@ foreach ($categories as $cat) {
                 } else {
                     $av_src = $config['http_home_url'] . 'uploads/fotos/' . $lp['foto'];
                 }
-                $lp_avatar = '<img src="' . htmlspecialchars($av_src, ENT_QUOTES, 'UTF-8') . '" alt="' . $lp_user . '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--mybb-border-color);flex-shrink:0;">';
+                $lp_avatar = '<img src="' . htmlspecialchars($av_src, ENT_QUOTES, 'UTF-8') . '" alt="' . $lp_user . '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--forum-border-color);flex-shrink:0;">';
             } else {
-                $lp_avatar = '<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#e0eaf8;border:2px solid var(--mybb-border-color);flex-shrink:0;"><i class="fa fa-user" style="font-size:13px;color:#93c5fd;"></i></span>';
+                $lp_avatar = '<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#e0eaf8;border:2px solid var(--forum-border-color);flex-shrink:0;"><i class="fa fa-user" style="font-size:13px;color:#93c5fd;"></i></span>';
             }
         }
 
@@ -123,6 +138,14 @@ foreach ($categories as $cat) {
         $tpl2->set("{sf_description}", htmlspecialchars($sub['description'], ENT_QUOTES, 'UTF-8'));
         $tpl2->set("{sf_topics}",      $sub_topics);
         $tpl2->set("{sf_posts}",       $sub_posts);
+        $tpl2->set("{sf_unread}",      $sub_unread);
+
+        if ($sub_unread > 0) {
+            $tpl2->set("[sf-unread]",  "");
+            $tpl2->set("[/sf-unread]", "");
+        } else {
+            $tpl2->set_block("'\\[sf-unread\\](.*?)\\[/sf-unread\\]'si", "");
+        }
 
         $sf_icon = trim((string) ($sub["icon"] ?? ""));
         if ($sf_icon !== "") {
@@ -131,7 +154,7 @@ foreach ($categories as $cat) {
                 forum_cat_icon_render_html(
                     $sf_icon,
                     "",
-                    "font-size:13px;color:var(--mybb-text-secondary);width:16px;height:16px;object-fit:contain;",
+                    "font-size:13px;color:var(--forum-text-secondary);width:16px;height:16px;object-fit:contain;",
                 ),
             );
             $tpl2->set("[sf-has-icon]", "");
@@ -187,23 +210,18 @@ foreach ($categories as $cat) {
         "mr-2",
         "font-size:14px;opacity:0.85;width:16px;height:16px;object-fit:contain;",
     );
-    $cat_list .= '<div class="mybb-category-block">'
-        . '<div class="mybb-cat-header">'
-        .   '<span class="mybb-cat-title">' . $cat_icon_html . $name . '</span>'
-        .   '<span class="mybb-cat-toggle"><i class="fa fa-minus"></i></span>'
-        . '</div>'
+    $cat_list .= '<section class="forum-category-block">'
+        . '<header class="forum-cat-bar forum-cat-header">'
+        .   '<h2 class="forum-cat-title">' . $cat_icon_html . $name . '</h2>'
+        .   '<span class="forum-cat-toggle" role="button" tabindex="0"><i class="fa fa-minus" aria-hidden="true"></i></span>'
+        . '</header>'
         . ( $subs
-            ? '<div class="mybb-sub-header">'
-              .   '<div class="mybb-col-forum">' . $lang['forum_main_col_forum'] . '</div>'
-              .   '<div class="mybb-col-stats">' . $lang['forum_main_col_stats'] . '</div>'
-              .   '<div class="mybb-col-lastpost">' . $lang['forum_main_col_lastpost'] . '</div>'
-              . '</div>'
-              . '<div class="mybb-cat-rows">' . $subs . '</div>'
-            : '<div class="mybb-cat-rows" style="padding: 0.9rem 1.2rem; color: var(--mybb-text-muted); font-size: 12px; font-style: italic;">'
-              .   '<i class="fa fa-folder-o mr-2"></i>' . $lang['forum_main_no_subforums']
-              . '</div>'
+            ? '<div class="forum-rows">' . $subs . '</div>'
+            : '<div class="forum-rows"><div class="forum-rows__empty">'
+              .   '<i class="fa fa-folder-o" aria-hidden="true"></i> ' . $lang['forum_main_no_subforums']
+              . '</div></div>'
           )
-        . '</div>';
+        . '</section>';
 }
 
 $tpl->set(
@@ -212,12 +230,31 @@ $tpl->set(
 );
 $tpl->set("{forum_title}",    $forum_title);
 $tpl->set("{http_home_url}",  $config["http_home_url"]);
+$tpl->set("{forum_rss_title}", $lang['forum_rss_title'] ?? 'RSS');
+if (!empty($forum_cfg["enable_rss"])) {
+    $tpl->set("[has-rss]", "");
+    $tpl->set("[/has-rss]", "");
+} else {
+    $tpl->set_block("'\\[has-rss\\](.*?)\\[/has-rss\\]'si", "");
+}
+if (!empty($forum_cfg["enable_online"])) {
+    $tpl->set("[has-online]", "");
+    $tpl->set("[/has-online]", "");
+} else {
+    $tpl->set_block("'\\[has-online\\](.*?)\\[/has-online\\]'si", "");
+}
+if (!empty($forum_cfg["enable_statistics"])) {
+    $tpl->set("[has-stats]", "");
+    $tpl->set("[/has-stats]", "");
+} else {
+    $tpl->set_block("'\\[has-stats\\](.*?)\\[/has-stats\\]'si", "");
+}
 
 // -------------------------------------------------
 // Online Üyeler & İstatistikler
 // -------------------------------------------------
 $online_time = time() - 900;
-$db->query("SELECT user_id, name, user_group FROM " . USERPREFIX . "_users WHERE lastdate > '{$online_time}' ORDER BY name ASC");
+$db->query("SELECT user_id, name, user_group, foto FROM " . USERPREFIX . "_users WHERE lastdate > '{$online_time}' ORDER BY name ASC");
 $online_members       = [];
 $online_members_count = 0;
 while ($row = $db->get_row()) {
@@ -228,12 +265,17 @@ while ($row = $db->get_row()) {
     elseif ($g == 2) $om_style = 'color:#2563eb; font-weight:bold;';
     elseif ($g == 3) $om_style = 'color:#059669; font-weight:bold;';
     else             $om_style = 'color:#374151;';
-    $online_members[] = '<a href="' . $profile_url . '" style="' . $om_style . '" class="hover:underline">'
-        . htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8') . '</a>';
+    $om_avatar = forum_user_avatar_html($row['foto'] ?? '', stripslashes($row['name']), 48, 12);
+    $online_members[] =
+        '<a class="forum-online-chip" href="' . $profile_url . '">' .
+        '<span class="forum-online-chip__avatar">' . $om_avatar . '</span>' .
+        '<span class="forum-online-chip__name" style="' . $om_style . '">' .
+        htmlspecialchars($row['name'], ENT_QUOTES, 'UTF-8') .
+        '</span></a>';
 }
 $online_members_html = $online_members_count > 0
-    ? implode(', ', $online_members)
-    : '<span class="text-gray-400 italic">' . $lang['forum_main_no_active_users'] . '</span>';
+    ? implode('', $online_members)
+    : '<span class="forum-online-empty">' . $lang['forum_main_no_active_users'] . '</span>';
 
 $total_topics_row = $db->super_query("SELECT COUNT(*) as cnt FROM " . PREFIX . "_forum_topics WHERE is_deleted=0");
 $total_topics     = intval($total_topics_row['cnt']);

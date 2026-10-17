@@ -17,7 +17,7 @@ if (!defined("DATALIFEENGINE")) {
 // POST: KATEGORI IZINLERINI TOPLU KAYDET
 // -------------------------------------------------
 if (isset($_POST["save_perms"])) {
-    if ($_POST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_POST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -101,7 +101,7 @@ while ($row = $db->get_row()) {
     </div>
 
     <form method="post" action="?mod=forum&action=permissions">
-      <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+      <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
 
       <div class="table-responsive">
         <table class="table table-striped">

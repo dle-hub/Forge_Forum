@@ -2,23 +2,35 @@
     <!-- Breadcrumb -->
     {forum_breadcrumb}
 
-    <!-- MyBB Musk Secondary Navigation Strip -->
-    <div class="mybb-actions-strip">
-        <div class="flex gap-4 text-xs font-bold text-gray-700 flex-wrap">
-            <a href="{http_home_url}index.php?do=forum&action=search&mode=new" class="mybb-strip-link"><i class="fa fa-list-alt"></i> Yeni Mesajları Gör</a>
-            <a href="{http_home_url}index.php?do=forum&action=search&mode=today" class="mybb-strip-link"><i class="fa fa-calendar-o"></i> Bugünkü Mesajları Gör</a>
+    <!-- Araç çubuğu -->
+    <div class="forum-toolbar">
+        <div class="forum-toolbar__links">
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=search&mode=new"><i class="fa fa-list-alt"></i><span>{forum_ui_new_posts}</span></a>
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=search&mode=today"><i class="fa fa-calendar-o"></i><span>{forum_ui_today_posts}</span></a>
+            [has-online]
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=online"><i class="fa fa-users"></i><span>{forum_ui_online}</span></a>
+            [/has-online]
+            [has-stats]
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=statistics"><i class="fa fa-bar-chart"></i><span>{forum_ui_stats_nav}</span></a>
+            [/has-stats]
+            [has-rss]
+            <a class="forum-toolbar__btn" href="{http_home_url}forum/rss/" title="{forum_rss_title}"><i class="fa fa-rss"></i><span>RSS</span></a>
+            [/has-rss]
             [is-logged]
-            <a href="{http_home_url}index.php?do=forum&action=notifications" class="mybb-notif-nav-link">
-                <i class="fa fa-bell"></i> Bildirimler
-                [has-forum-notifs]<span class="notif-nav-badge">{forum_notif_count}</span>[/has-forum-notifs]
-            </a>
+            <span class="forum-toolbar__sep" aria-hidden="true"></span>
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=notifications"><i class="fa fa-bell"></i><span>{forum_ui_notifications}</span>[has-forum-notifs]<span class="forum-toolbar__count">{forum_notif_count}</span>[/has-forum-notifs]</a>
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=subscriptions"><i class="fa fa-bookmark"></i><span>{forum_ui_subscriptions}</span></a>
+            [group=1,2]
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum&action=mod"><i class="fa fa-shield"></i><span>{forum_ui_moderation}</span></a>
+            [/group]
+            <a class="forum-toolbar__btn" href="#" onclick="forumMarkReadAll(); return false;"><i class="fa fa-check-circle-o"></i><span>{forum_ui_mark_all_read}</span></a>
             [/is-logged]
         </div>
-        <form method="get" action="{http_home_url}index.php" class="flex items-center gap-1">
+        <form method="get" action="{http_home_url}index.php" class="forum-toolbar__search">
             <input type="hidden" name="do" value="forum">
             <input type="hidden" name="action" value="search">
-            <input type="text" name="q" placeholder="Ara..." required minlength="3" class="px-2.5 py-1 border text-xs rounded" style="width: 140px; background: #ffffff;">
-            <button type="submit" class="bg-gray-100 hover:bg-gray-200 border border-gray-300 px-2 py-1 rounded text-xs cursor-pointer"><i class="fa fa-search text-gray-500"></i></button>
+            <input type="text" name="q" placeholder="{forum_ui_search_placeholder}" required minlength="3">
+            <button type="submit" title="{forum_ui_search}"><i class="fa fa-search"></i></button>
         </form>
     </div>
 
@@ -27,30 +39,52 @@
         {categories}
     </div>
 
-    <!-- MyBB Board Statistics Panel -->
-    <div class="mybb-stats-card">
-        <div class="mybb-cat-header">
-            <span class="mybb-cat-title"><i class="fa fa-bar-chart mr-1.5"></i> Forum İstatistikleri</span>
-            <span class="mybb-cat-toggle"><i class="fa fa-minus"></i></span>
-        </div>
-        
-        <!-- Subsection: Who's Online -->
-        <div class="mybb-stats-section">
-            <div class="mybb-stats-sec-title">Kimler Çevrimiçi <span class="text-gray-400 text-xs font-normal">[Tam Liste]</span></div>
-            <div class="mybb-stats-sec-content mt-1">
-                <p>{online_summary}</p>
-                <div class="mt-1 font-semibold flex flex-wrap gap-2 text-sm">{online_list}</div>
-            </div>
+    <!-- Forum Board Statistics Panel -->
+    <div class="forum-stats-card">
+        <div class="forum-cat-header">
+            <span class="forum-cat-title"><i class="fa fa-bar-chart mr-1.5"></i> {forum_ui_forum_stats}</span>
+            <span class="forum-cat-toggle"><i class="fa fa-minus"></i></span>
         </div>
 
-        <!-- Subsection: Board Statistics -->
-        <div class="mybb-stats-section">
-            <div class="mybb-stats-sec-title">Forum İstatistikleri</div>
-            <div class="mybb-stats-sec-content mt-1 space-y-1">
-                <p>Üyelerimiz toplamda <span class="font-bold text-gray-700">{total_posts} mesaj</span> yazdı (<span class="font-bold text-gray-700">{total_threads} konu</span>).</p>
-                <p>Şu anda kayıtlı <span class="font-bold text-gray-700">{total_members} üyemiz</span> var.</p>
-                <p>Aramıza yeni katılan üyemize merhaba diyelim: {newest_member}</p>
+        <div class="forum-stats-panels">
+            <!-- Subsection: Who's Online -->
+            <div class="forum-panel">
+                <div class="forum-panel__title forum-panel__title--ico">
+                    <span class="forum-online-dot" aria-hidden="true"></span>
+                    {forum_ui_online}
+                    [has-online]<a class="forum-panel__title-link" href="{http_home_url}index.php?do=forum&action=online">{forum_ui_full_list} <i class="fa fa-arrow-right"></i></a>[/has-online]
+                </div>
+                <p class="forum-stats-meta">{online_summary}</p>
+                <div class="forum-online-chipwrap">{online_list}</div>
+            </div>
+
+            <!-- Subsection: Board Statistics -->
+            <div class="forum-panel">
+                <div class="forum-panel__title forum-panel__title--ico">
+                    <i class="fa fa-pie-chart"></i>
+                    {forum_ui_forum_stats}
+                </div>
+                <div class="forum-mini-stats">
+                    <div class="forum-mini-stat"><span class="forum-mini-stat__num">{total_threads}</span><span class="forum-mini-stat__label">{forum_ui_topic_label}</span></div>
+                    <div class="forum-mini-stat"><span class="forum-mini-stat__num">{total_posts}</span><span class="forum-mini-stat__label">{forum_ui_posts_label}</span></div>
+                    <div class="forum-mini-stat"><span class="forum-mini-stat__num">{total_members}</span><span class="forum-mini-stat__label">{forum_ui_members_label}</span></div>
+                </div>
+                <div class="forum-newest">
+                    <span class="forum-newest__label"><i class="fa fa-user-plus"></i> {forum_ui_newest_member}</span>
+                    <span class="forum-newest__user">{newest_member}</span>
+                </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+function forumMarkReadAll() {
+    if (typeof jQuery === 'undefined') return;
+    jQuery.post('{http_home_url}index.php?controller=ajax&mod=forum_read', {
+        cat_id: 0, user_hash: dle_login_hash
+    }, function (r) {
+        if (r && r.success) { window.location.reload(); }
+    }, 'json');
+}
+</script>

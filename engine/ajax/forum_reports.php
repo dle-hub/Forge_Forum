@@ -29,6 +29,12 @@ $id       = isset($_POST['id']) ? intval($_POST['id']) : 0;
 $mod_id   = intval($member_id['user_id']);
 $_IP      = $_SERVER['REMOTE_ADDR'];
 
+// CSRF korumasi (durum degistiren tum istekler: add + moderasyon)
+if( empty($_POST['user_hash']) || $_POST['user_hash'] !== $dle_login_hash ) {
+    echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_csrf']]);
+    exit;
+}
+
 // Sadece 'add' işlemine tüm giriş yapmış üyeler izinli, diğer işlemler admin/mod yetkisi (<=2) gerektirir!
 if ($action !== 'add') {
     if( $member_id['user_group'] > 2 ) {
@@ -127,6 +133,5 @@ switch($action) {
 
     default:
         echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_unknown_action']]);
-}
 }
 exit;

@@ -40,6 +40,26 @@ $defaults = [
     "enable_dislikes" => "1",
     "enable_notifications" => "1",
     "enable_subscriptions" => "1",
+    "enable_email_notify" => "1",
+    "enable_topic_rating" => "1",
+    "enable_rss" => "1",
+    "enable_sitemap" => "1",
+    "enable_solved" => "1",
+    "enable_best_answer" => "1",
+    "enable_similar" => "1",
+    "enable_viewers" => "1",
+    "enable_online" => "1",
+    "enable_follow" => "1",
+    "enable_drafts" => "1",
+    "enable_edit_history" => "1",
+    "enable_opengraph" => "1",
+    "enable_unread_badge" => "1",
+    "enable_cat_subscribe" => "1",
+    "enable_statistics" => "1",
+    "enable_captcha_topic" => "1",
+    "enable_captcha_reply" => "1",
+    "enable_topic_edit_owner" => "1",
+    "enable_topic_edit_mods" => "1",
     "enable_ranks" => "1",
     "enable_polls" => "1",
     "editor_enabled" => "1",
@@ -54,6 +74,7 @@ $defaults = [
     "poll_max_selections" => "5",
     "poll_default_days" => "30",
     "theme_header_color" => "#1d2d44",
+    "theme_mode" => "theme",
 ];
 
 $settings = [];
@@ -64,7 +85,7 @@ while ($row = $db->get_row()) {
 $cfg = array_merge($defaults, $settings);
 
 if (isset($_POST["save_settings"])) {
-    if ($_POST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_POST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -77,6 +98,8 @@ if (isset($_POST["save_settings"])) {
             $value = isset($_POST[$key]) ? trim($_POST[$key]) : "";
         } elseif ($key === "theme_header_color") {
             $value = forum_settings_normalize_color($_POST[$key] ?? "#1d2d44");
+        } elseif ($key === "theme_mode") {
+            $value = in_array($_POST[$key] ?? "", ["theme", "light", "dark", "system"], true) ? $_POST[$key] : "theme";
         } else {
             $value = isset($_POST[$key]) ? trim($_POST[$key]) : "0";
         }
@@ -137,6 +160,20 @@ function editorTypeSelect($n, $s)
     $tinymce = $s == "tinymce" ? " selected" : "";
     return "<select class=\"uniform\" name=\"{$n}\" data-width=\"150\"><option value=\"froala\"{$froala}>Froala Editor</option><option value=\"tinymce\"{$tinymce}>TinyMCE</option></select>";
 }
+function themeModeSelect($n, $s)
+{
+    global $lang;
+    $s = in_array($s, ["theme", "light", "dark", "system"], true) ? $s : "theme";
+    $theme = $s === "theme" ? " selected" : "";
+    $light = $s === "light" ? " selected" : "";
+    $dark = $s === "dark" ? " selected" : "";
+    $system = $s === "system" ? " selected" : "";
+    $theme_label = $lang["forum_set_theme_follow"] ?? "Tema ile aynı (Otomatik)";
+    $light_label = $lang["forum_set_theme_light"] ?? "Açık (Light)";
+    $dark_label = $lang["forum_set_theme_dark"] ?? "Koyu (Dark)";
+    $system_label = $lang["forum_set_theme_system"] ?? "Sistem (Otomatik)";
+    return "<select class=\"uniform\" name=\"{$n}\" data-width=\"180\"><option value=\"theme\"{$theme}>{$theme_label}</option><option value=\"light\"{$light}>{$light_label}</option><option value=\"dark\"{$dark}>{$dark_label}</option><option value=\"system\"{$system}>{$system_label}</option></select>";
+}
 function num($n, $v, $w = "100")
 {
     return "<input type=\"number\" name=\"{$n}\" class=\"form-control width-{$w}\" value=\"" .
@@ -168,6 +205,7 @@ function forum_settings_normalize_color($color)
 }
 function themeHeaderColorPicker($name, $value)
 {
+    global $lang;
     $value = forum_settings_normalize_color($value);
     $presets = [
         "#1d2d44",
@@ -208,7 +246,9 @@ function themeHeaderColorPicker($name, $value)
         '" maxlength="7" placeholder="#1d2d44">'
         . '<span id="forum_theme_header_preview" style="display:inline-flex;align-items:center;justify-content:space-between;min-width:180px;padding:8px 12px;border-radius:4px;color:#fff;font-size:12px;font-weight:600;background:' .
         htmlspecialchars($value, ENT_QUOTES, "UTF-8") .
-        ';">Kategori Başlığı <i class="fa fa-minus" style="opacity:.75;"></i></span>'
+        ';">' .
+        htmlspecialchars($lang["forum_set_theme_header_preview"] ?? "Kategori Başlığı", ENT_QUOTES, "UTF-8") .
+        ' <i class="fa fa-minus" style="opacity:.75;"></i></span>'
         . "</div>"
         . '<div style="margin-top:10px;">' .
         $swatches .
@@ -318,7 +358,7 @@ $(function() {
 </div>
 
 <form method="post" action="?mod=forum&action=settings" class="systemsettings">
-    <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+    <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
 
 <?php
 forumSettingsPanelOpen("forum-set-view", $lang["forum_set_section_view"], true);
@@ -330,6 +370,11 @@ showRow($lang['forum_set_max_len'], $lang['forum_set_max_len_desc'], num("max_po
 forumSettingsPanelClose();
 
 forumSettingsPanelOpen("forum-set-theme", $lang["forum_set_section_theme"]);
+showRow(
+    $lang['forum_set_theme_mode'] ?? 'Tema Modu',
+    $lang['forum_set_theme_mode_desc'] ?? 'Forumun renk şeması (Açık / Koyu).',
+    themeModeSelect("theme_mode", $cfg["theme_mode"]),
+);
 showRow(
     $lang['forum_set_theme_header'],
     $lang['forum_set_theme_header_desc'],
@@ -402,7 +447,30 @@ showRow($lang['forum_set_likes'], $lang['forum_set_likes_desc'], yn("enable_like
 showRow($lang['forum_set_dislikes'], $lang['forum_set_dislikes_desc'], yn("enable_dislikes", $cfg["enable_dislikes"]));
 showRow($lang['forum_set_notifications'], $lang['forum_set_notifications_desc'], yn("enable_notifications", $cfg["enable_notifications"]));
 showRow($lang['forum_set_subscriptions'], $lang['forum_set_subscriptions_desc'], yn("enable_subscriptions", $cfg["enable_subscriptions"]));
+showRow($lang['forum_set_email_notify'], $lang['forum_set_email_notify_desc'], yn("enable_email_notify", $cfg["enable_email_notify"]));
+showRow($lang['forum_set_rating'], $lang['forum_set_rating_desc'], yn("enable_topic_rating", $cfg["enable_topic_rating"]));
 showRow($lang['forum_set_ranks'], $lang['forum_set_ranks_desc'], yn("enable_ranks", $cfg["enable_ranks"]));
+forumSettingsPanelClose();
+
+forumSettingsPanelOpen("forum-set-modules", $lang["forum_set_section_modules"]);
+showRow($lang['forum_set_rss'], $lang['forum_set_rss_desc'], yn("enable_rss", $cfg["enable_rss"]));
+showRow($lang['forum_set_sitemap'], $lang['forum_set_sitemap_desc'], yn("enable_sitemap", $cfg["enable_sitemap"]));
+showRow($lang['forum_set_solved'], $lang['forum_set_solved_desc'], yn("enable_solved", $cfg["enable_solved"]));
+showRow($lang['forum_set_best'], $lang['forum_set_best_desc'], yn("enable_best_answer", $cfg["enable_best_answer"]));
+showRow($lang['forum_set_similar'], $lang['forum_set_similar_desc'], yn("enable_similar", $cfg["enable_similar"]));
+showRow($lang['forum_set_viewers'], $lang['forum_set_viewers_desc'], yn("enable_viewers", $cfg["enable_viewers"]));
+showRow($lang['forum_set_online'], $lang['forum_set_online_desc'], yn("enable_online", $cfg["enable_online"]));
+showRow($lang['forum_set_follow'], $lang['forum_set_follow_desc'], yn("enable_follow", $cfg["enable_follow"]));
+showRow($lang['forum_set_drafts'], $lang['forum_set_drafts_desc'], yn("enable_drafts", $cfg["enable_drafts"]));
+showRow($lang['forum_set_edithist'], $lang['forum_set_edithist_desc'], yn("enable_edit_history", $cfg["enable_edit_history"]));
+showRow($lang['forum_set_og'], $lang['forum_set_og_desc'], yn("enable_opengraph", $cfg["enable_opengraph"]));
+showRow($lang['forum_set_unread'], $lang['forum_set_unread_desc'], yn("enable_unread_badge", $cfg["enable_unread_badge"]));
+showRow($lang['forum_set_cat_sub'], $lang['forum_set_cat_sub_desc'], yn("enable_cat_subscribe", $cfg["enable_cat_subscribe"]));
+showRow($lang['forum_set_stats'], $lang['forum_set_stats_desc'], yn("enable_statistics", $cfg["enable_statistics"]));
+showRow($lang['forum_set_captcha_topic'], $lang['forum_set_captcha_topic_desc'], yn("enable_captcha_topic", $cfg["enable_captcha_topic"]));
+showRow($lang['forum_set_captcha_reply'], $lang['forum_set_captcha_reply_desc'], yn("enable_captcha_reply", $cfg["enable_captcha_reply"]));
+showRow($lang['forum_set_edit_owner'], $lang['forum_set_edit_owner_desc'], yn("enable_topic_edit_owner", $cfg["enable_topic_edit_owner"]));
+showRow($lang['forum_set_edit_mods'], $lang['forum_set_edit_mods_desc'], yn("enable_topic_edit_mods", $cfg["enable_topic_edit_mods"]));
 forumSettingsPanelClose();
 ?>
 

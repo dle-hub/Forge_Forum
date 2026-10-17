@@ -132,7 +132,120 @@ class ForumUploadFileViaURL {
 
         return $filename;
     }
-	
+
+	/**
+	 * SSRF korumasi: URL host'unun ozel/ayrilmis (reserved) bir adrese
+	 * cozulup cozulmedigini denetler. DNS rebinding'e karsi host'u cozumler ve
+	 * donen tum IP'leri tek tek dogrular.
+	 *
+	 * @param array $url parse_url() ciktisi
+	 * @return bool true = engelli
+	 */
+	private function isForbiddenUrl( $url ) {
+
+		if ( !is_array($url) OR empty($url['host']) OR empty($url['scheme']) ) return true;
+
+		if ($url['scheme'] != 'http' AND $url['scheme'] != 'https') return true;
+
+		$host = strtolower( trim( $url['host'], "[]" ) );
+
+		if ( $host === '' ) return true;
+
+		if ( $host == 'localhost' ) return true;
+
+		// Sayisal / alternatif IP temsili (127.1, 0x7f000001, 2130706433, 0177.0.0.1 ...)
+		$literal = $this->hostToIp( $host );
+		if ( $literal !== null ) {
+			return $this->ipIsForbidden( $literal );
+		}
+
+		$ips = array();
+
+		$resolved = @gethostbynamel( $host );
+		if ( is_array($resolved) ) $ips = $resolved;
+
+		if ( !$ips ) {
+			$records = @dns_get_record( $host, DNS_AAAA );
+			if ( is_array($records) ) {
+				foreach ( $records as $rec ) {
+					if ( !empty($rec['ipv6']) ) $ips[] = $rec['ipv6'];
+				}
+			}
+		}
+
+		// Cozulemiyorsa guvenli tarafta kal
+		if ( !$ips ) return true;
+
+		foreach ( $ips as $ip ) {
+			if ( $this->ipIsForbidden( $ip ) ) return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Ozel veya ayrilmis (loopback, link-local, CGNAT, vb.) IP adreslerini engeller.
+	 */
+	private function ipIsForbidden( $ip ) {
+
+		if ( filter_var( $ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE ) === false ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	/**
+	 * Host metnini IPv4'e normalizer (inet_aton semantigi: 1-4 parca, ondalik/sekizlik/hex).
+	 * Gercek bir IP degilse null doner.
+	 */
+	private function hostToIp( $host ) {
+
+		if ( filter_var( $host, FILTER_VALIDATE_IP ) ) return $host;
+
+		if ( strpos( $host, '.' ) === false AND !preg_match('/^(0x[0-9a-f]+|\d+)$/i', $host) ) {
+			return null;
+		}
+
+		$parts = explode( '.', $host );
+		if ( count( $parts ) > 4 ) return null;
+
+		$nums = array();
+		foreach ( $parts as $p ) {
+			$p = trim( $p );
+			if ( $p === '' ) return null;
+			if ( preg_match( '/^0x[0-9a-f]+$/i', $p ) ) {
+				$n = hexdec( substr( $p, 2 ) );
+			} elseif ( strlen( $p ) > 1 AND $p[0] === '0' AND ctype_digit( $p ) ) {
+				$n = octdec( $p );
+			} elseif ( ctype_digit( $p ) ) {
+				$n = (int) $p;
+			} else {
+				return null;
+			}
+			$nums[] = $n;
+		}
+
+		$count = count( $nums );
+
+		if ( $count === 1 ) {
+			$val = $nums[0];
+		} elseif ( $count === 2 ) {
+			if ( $nums[0] > 255 OR $nums[1] > 16777215 ) return null;
+			$val = ( $nums[0] << 24 ) | $nums[1];
+		} elseif ( $count === 3 ) {
+			if ( $nums[0] > 255 OR $nums[1] > 255 OR $nums[2] > 65535 ) return null;
+			$val = ( $nums[0] << 24 ) | ( $nums[1] << 16 ) | $nums[2];
+		} else {
+			if ( $nums[0] > 255 OR $nums[1] > 255 OR $nums[2] > 255 OR $nums[3] > 255 ) return null;
+			$val = ( $nums[0] << 24 ) | ( $nums[1] << 16 ) | ( $nums[2] << 8 ) | $nums[3];
+		}
+
+		if ( $val < 0 OR $val > 4294967295 ) return null;
+
+		return long2ip( $val );
+	}
+
     function getFileName() {
 		
 		$img_extensions = array("gif", "jpg", "png", "jpeg", "webp", "bmp", "avif", "heic");
@@ -159,9 +272,18 @@ class ForumUploadFileViaURL {
             return '';
 		}
 
-		if( stripos ( $url['host'], $_SERVER['HTTP_HOST'] ) !== false ) {
+		$http_host = $_SERVER['HTTP_HOST'] ?? '';
 
-			return '';
+		if( $http_host && stripos ( $url['host'], $http_host ) !== false ) {
+
+            return '';
+
+		}
+
+		// SSRF: ozel/ic ag adresleri ve sayisal/alternatif IP temsillerini engelle
+		if( $this->isForbiddenUrl( $url ) ) {
+
+            return '';
 
 		}
 		
@@ -192,6 +314,9 @@ class ForumUploadFileViaURL {
 		$url = @parse_url( $this->from );
 
 		if ( $url ) {
+
+			// SSRF: bir sekilde ozel/ic ag adresine isaret ediyorsa soket acma
+			if ( $this->isForbiddenUrl( $url ) ) return 0;
 			
 			if($url['scheme'] == "https" ) $port = 443; else $port = 80;
 
@@ -556,6 +681,21 @@ class ForumFileUploader {
 		$type = totranslit( end( $filename_arr ) );
 		
 		if(!$type) return false;
+
+		// Uzanti whitelist: yalnizca ayarlarda izin verilen turler kabul edilir
+		$allowed_union = array_merge( $this->allowed_files, $this->allowed_extensions, $this->allowed_video );
+		$allowed_union = array_filter( array_map( function( $e ) { return strtolower( trim( (string) $e ) ); }, $allowed_union ) );
+
+		// Calistirilabilir/aktif icerik uzantilari hicbir zaman kabul edilmez
+		$denied_ext = array(
+			'php','php3','php4','php5','php7','php8','phtml','phtm','phps','phar','pht',
+			'shtml','shtm','cgi','pl','asp','aspx','jsp','jspx','htaccess','htm','html',
+			'xhtml','svg','swf','js','mjs','exe','dll','so','ini','sh','bat','cmd'
+		);
+
+		if ( in_array( strtolower( $type ), $denied_ext, true ) ) return false;
+
+		if ( !in_array( strtolower( $type ), $allowed_union, true ) ) return false;
 		
 		$curr_key = key( $filename_arr );
 		
@@ -717,6 +857,9 @@ class ForumFileUploader {
 			
 			$db_file_name = $this->sanitize_db_filename($this->file->getFileName(), $uploaded_filename);
 			$base_name = pathinfo(str_replace(['\\', '/'], '', $this->file->getFileName()), PATHINFO_FILENAME);
+			// HTML cikti baglami icin guvenli temsil (dosya adi XSS korumasi)
+			$base_name_html = htmlspecialchars($base_name, ENT_QUOTES, 'UTF-8');
+			$db_file_name_html = htmlspecialchars(stripslashes($db_file_name), ENT_QUOTES, 'UTF-8');
 
 			$size = DLEFiles::Size( $this->upload_path . FOLDER_PREFIX . $uploaded_filename );
 			$driver = DLEFiles::$driver;
@@ -792,7 +935,7 @@ $return_box = <<<HTML
 	</div>
 	<div class="file-footer">
 		<div class="file-footer-caption">
-			<div class="file-caption-info" rel="tooltip" title="ID: {$id}, {$db_file_name}">{$base_name}</div>
+			<div class="file-caption-info" rel="tooltip" title="ID: {$id}, {$db_file_name_html}">{$base_name_html}</div>
 			<div class="file-size-info">({$size})</div>
 		</div>
 		<div class="file-footer-bottom">
@@ -958,6 +1101,7 @@ HTML;
 			$display_name = implode("_", $display_name);
 			
 			$base_name = pathinfo($display_name, PATHINFO_FILENAME);
+			$base_name_html = htmlspecialchars($base_name, ENT_QUOTES, 'UTF-8');
 			$file_type = explode(".", $display_name);
 			$file_type = totranslit(end($file_type));
 
@@ -970,7 +1114,7 @@ $return_box = <<<HTML
 	</div>
 	<div class="file-footer">
 		<div class="file-footer-caption">
-			<div class="file-caption-info" rel="tooltip" title="{$uploaded_filename}">{$base_name}</div>
+			<div class="file-caption-info" rel="tooltip" title="{$uploaded_filename}">{$base_name_html}</div>
 			<div class="file-size-info">{$dimension} ({$size})</div>
 		</div>
 		<div class="file-footer-bottom">

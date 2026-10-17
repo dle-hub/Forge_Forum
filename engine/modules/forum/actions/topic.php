@@ -95,7 +95,7 @@ $prefix_html = "";
 if (isset($topic["prefix_id"]) && $topic["prefix_id"] > 0) {
     $pfx = $db->super_query("SELECT name, color, icon FROM " . PREFIX . "_forum_prefixes WHERE id = '{$topic["prefix_id"]}'");
     if ($pfx && !empty($pfx['name'])) {
-        $prefix_html = '<span class="mybb-prefix-badge" style="background:' . htmlspecialchars($pfx["color"], ENT_QUOTES, "UTF-8") . '; color:#fff; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-right: 5px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa ' . htmlspecialchars($pfx["icon"], ENT_QUOTES, "UTF-8") . '"></i>' . htmlspecialchars($pfx["name"], ENT_QUOTES, "UTF-8") . '</span>';
+        $prefix_html = '<span class="forum-prefix-badge" style="background:' . htmlspecialchars($pfx["color"], ENT_QUOTES, "UTF-8") . '; color:#fff; padding: 2px 6px; border-radius: 3px; font-size: 11px; font-weight: bold; margin-right: 5px; display: inline-flex; align-items: center; gap: 4px;"><i class="fa ' . htmlspecialchars($pfx["icon"], ENT_QUOTES, "UTF-8") . '"></i>' . htmlspecialchars($pfx["name"], ENT_QUOTES, "UTF-8") . '</span>';
     }
 }
 
@@ -103,6 +103,52 @@ $plain_title = forum_word_filter(stripslashes($topic["title"]));
 $topic_title = $prefix_html . htmlspecialchars($plain_title, ENT_QUOTES, "UTF-8");
 $metatags["title"] = $plain_title . " — " . $forum_title;
 $metatags["description"] = mb_substr(strip_tags($plain_title), 0, 160);
+
+// Open Graph / sosyal paylaşım (DLE $social_tags üzerinden og:* üretir)
+if (!empty($forum_cfg["enable_opengraph"])) {
+$og_url =
+    $config["http_home_url"] .
+    "forum/topic/" .
+    $tid .
+    "-" .
+    $topic["alt_name"] .
+    ".html";
+$og_image = "";
+$og_desc = $plain_title;
+$first_p = $db->super_query(
+    "SELECT text FROM " . PREFIX . "_forum_posts
+     WHERE topic_id='{$tid}' AND is_deleted=0 AND is_approved=1 ORDER BY date ASC LIMIT 1",
+);
+if ($first_p && !empty($first_p["text"])) {
+    if (
+        preg_match(
+            '/<img[^>]+src=["\']([^"\']+)["\']/i',
+            stripslashes($first_p["text"]),
+            $ogm,
+        )
+    ) {
+        $og_image = $ogm[1];
+        $ssl = function_exists("isSSL") && isSSL();
+        if (strpos($og_image, "//") === 0) {
+            $og_image = ($ssl ? "https:" : "http:") . $og_image;
+        } elseif (strpos($og_image, "/") === 0) {
+            $og_image = ($ssl ? "https://" : "http://") . ($_SERVER["HTTP_HOST"] ?? "") . $og_image;
+        }
+    }
+    if (function_exists("forum_plain_text_snippet")) {
+        $snippet = trim(forum_plain_text_snippet($first_p["text"], 200));
+        if ($snippet !== "") {
+            $og_desc = $snippet;
+        }
+    }
+}
+$GLOBALS["social_tags"]["description"] = $og_desc;
+$GLOBALS["social_tags"]["url"] = $og_url;
+if ($og_image !== "") {
+    $GLOBALS["social_tags"]["image"] = $og_image;
+}
+$GLOBALS["canonical"] = $og_url;
+}
 
 $forum_speedbar[
     $config["http_home_url"] . "forum/" . $cat_alt . "/"
@@ -113,14 +159,32 @@ $forum_speedbar[""] = $plain_title;
 $topic_is_pinned = isset($topic["is_pinned"]) && $topic["is_pinned"] == 1;
 $topic_is_locked = isset($topic["is_locked"]) && $topic["is_locked"] == 1;
 
-// Custom Breadcrumb HTML
+// Kategori moderatörü mü? (global mod/yönetici değilse)
+$is_cat_mod =
+    $is_logged &&
+    intval($member_id["user_group"]) > 2 &&
+    function_exists("forum_user_is_cat_mod") &&
+    forum_user_is_cat_mod(intval($member_id["user_id"]), intval($topic["cat_id"]));
+
+// Konu düzenleme yetkileri (yönetimden açılıp kapatılabilir)
+$is_group_mod = $is_logged && intval($member_id["user_group"]) <= 2;
+$is_topic_owner =
+    $is_logged &&
+    intval($member_id["user_id"]) > 0 &&
+    intval($topic["user_id"]) === intval($member_id["user_id"]);
+$first_post_row = $db->super_query(
+    "SELECT id FROM " . PREFIX . "_forum_posts
+     WHERE topic_id='{$tid}' AND is_deleted=0 ORDER BY id ASC LIMIT 1",
+);
+$first_post_id = intval($first_post_row["id"] ?? 0);
+$cat_mod_can_edit = $is_cat_mod && !empty($forum_cfg["enable_topic_edit_mods"]);
+$owner_can_edit = $is_topic_owner && !empty($forum_cfg["enable_topic_edit_owner"]);
+$can_edit_topic = $first_post_id > 0 && ($is_group_mod || $cat_mod_can_edit || $owner_can_edit);
+$can_moderate_topic = $is_group_mod || $is_cat_mod;
+
+// Custom Breadcrumb HTML (Tailwind'siz, tema bağımsız)
 $breadcrumb_html = "";
 if (is_array($forum_speedbar) && count($forum_speedbar) > 0) {
-    $breadcrumb_html .=
-        '<nav class="flex mb-5 px-4 py-3 text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm" aria-label="Breadcrumb">';
-    $breadcrumb_html .=
-        '<ol class="inline-flex items-center space-x-3 list-none p-0 m-0">';
-
     $final_crumbs = [
         $config["http_home_url"] => $lang['forum_breadcrumb_home'],
         $config["http_home_url"] . "forum/" => $lang['forum_breadcrumb_forum'],
@@ -131,6 +195,9 @@ if (is_array($forum_speedbar) && count($forum_speedbar) > 0) {
     $counter = 0;
     $total = count($final_crumbs);
 
+    $breadcrumb_html .= '<nav class="forum-breadcrumb" aria-label="Breadcrumb">';
+    $breadcrumb_html .= '<ol class="forum-breadcrumb__list">';
+
     foreach ($final_crumbs as $url => $title) {
         $counter++;
         $title = htmlspecialchars(
@@ -139,37 +206,28 @@ if (is_array($forum_speedbar) && count($forum_speedbar) > 0) {
             "UTF-8",
         );
 
-        $breadcrumb_html .= '<li class="inline-flex items-center">';
+        $breadcrumb_html .= '<li class="forum-breadcrumb__item">';
         if ($counter > 1) {
             $breadcrumb_html .=
-                '<svg class="w-4 h-4 text-gray-400 mx-1" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>';
+                '<span class="forum-breadcrumb__sep" aria-hidden="true">&rsaquo;</span>';
         }
 
         if ($url !== "" && $counter < $total) {
-            if ($counter == 1) {
+            $breadcrumb_html .= '<a href="' . $url . '">';
+            if ($counter === 1) {
                 $breadcrumb_html .=
-                    '<a href="' .
-                    $url .
-                    '" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 transition">';
-                $breadcrumb_html .=
-                    '<svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h2a1 1 0 001-1v-6.586l.707.707a1 1 0 001.414-1.414l-7-7z"></path></svg>';
-                $breadcrumb_html .= $title . "</a>";
-            } else {
-                $breadcrumb_html .=
-                    '<a href="' .
-                    $url .
-                    '" class="text-sm font-medium text-gray-700 hover:text-blue-600 transition">' .
-                    $title .
-                    "</a>";
+                    '<i class="fa fa-home forum-breadcrumb__home" aria-hidden="true"></i>';
             }
+            $breadcrumb_html .= $title . "</a>";
         } else {
             $breadcrumb_html .=
-                '<span class="text-sm font-semibold text-gray-500 truncate max-w-xs md:max-w-md block" aria-current="page">' .
+                '<span class="forum-breadcrumb__current" aria-current="page">' .
                 $title .
                 "</span>";
         }
         $breadcrumb_html .= "</li>";
     }
+
     $breadcrumb_html .= "</ol></nav>";
 }
 
@@ -215,12 +273,12 @@ $offset = ($f_page - 1) * $perpage;
 $posts = [];
 $db->query(
     "SELECT p.*, u.name AS user_name, u.user_id AS uid, u.foto, u.email,
-            u.forum_points, u.forum_rank_id, u.forum_post_count, u.user_group
+            u.forum_points, u.forum_rank_id, u.forum_post_count, u.user_group, u.signature
      FROM " .
         PREFIX .
         "_forum_posts p
      LEFT JOIN " .
-        PREFIX .
+        USERPREFIX .
         "_users u ON u.user_id = p.user_id
      WHERE p.topic_id = '{$tid}' AND p.is_deleted = 0 AND p.is_approved = 1
      ORDER BY p.date ASC
@@ -259,12 +317,21 @@ $db->query("SELECT t.name, t.alt_name FROM " . PREFIX . "_forum_tags t
             WHERE tt.topic_id = '{$tid}'");
 $tag_links = [];
 while ($trow = $db->get_row()) {
-    $tag_links[] = '<a href="' . $config['http_home_url'] . 'forum/search/?q=' . urlencode($trow['name']) . '" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded border transition flex items-center gap-1"><i class="fa fa-tag text-gray-400"></i>' . htmlspecialchars($trow['name'], ENT_QUOTES, "UTF-8") . '</a>';
+    $tag_links[] = '<a href="' . $config['http_home_url'] . 'forum/etiket/' . urlencode($trow['alt_name']) . '/" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-600 px-2.5 py-1 rounded border transition flex items-center gap-1"><i class="fa fa-tag text-gray-400"></i>' . htmlspecialchars($trow['name'], ENT_QUOTES, "UTF-8") . '</a>';
 }
 if (count($tag_links) > 0) {
     $tags_html = '<div class="mt-3 mb-5 p-4 border border-gray-200 bg-white rounded shadow-sm flex flex-wrap items-center gap-2">
         <span class="text-xs font-bold text-gray-500 uppercase tracking-wider mr-1"><i class="fa fa-tags text-blue-500 mr-1"></i> ' . $lang['forum_topic_tags_label'] . '</span>' . implode('', $tag_links) . '</div>';
 }
+
+// EN İYİ CEVAP (best answer)
+$best_post_id = intval($topic["best_post_id"] ?? 0);
+$uid_ba = $is_logged ? intval($member_id["user_id"]) : 0;
+$can_best =
+    $is_logged &&
+    !empty($forum_cfg["enable_best_answer"]) &&
+    ($uid_ba === intval($topic["user_id"]) || intval($member_id["user_group"]) <= 2 || $is_cat_mod) &&
+    empty($topic["is_locked"]);
 
 // -------------------------------------------------
 // 9. MESAJ SATIRLARINI NATIVE TPL'DE DERLE
@@ -287,13 +354,9 @@ foreach ($posts as $idx => $p) {
     $p_posts = intval($p["forum_post_count"]);
     $p_pts = intval($p["forum_points"]);
     
-    $p_text = forum_word_filter(stripslashes($p["text"]));
+    $p_text = forum_word_filter($p["text"]);
     
-    // 1. Tehlikeli taglari temizle (XSS korumasi)
-    $p_text = preg_replace('/<script[^>]*>.*?<\/script>/is', '', $p_text);
-    $p_text = preg_replace('/\s+on\w+\s*=\s*["\'][^"\']*["\']/i', '', $p_text);
-    
-    // 2. BBCode + HTML birlikte isle
+    // 1. BBCode + HTML birlikte isle
     // BB_Parse(true) = wysiwyg modu: HTML'i escape ETMEZ, BBCode'u HTML'e cevirir
     // Bu sekilde hem TinyMCE HTML icerigi hem [quote=...] gibi BBCode dogru calisir
     if (method_exists($parse, 'BB_Parse')) {
@@ -316,6 +379,10 @@ foreach ($posts as $idx => $p) {
         }
     }
 
+    // 2. BB_Parse "slashed" cikti uretir (harici linklere addslashes uygular);
+    //    gosterim icin bir kez stripslashes, ardindan whitelist tabanli XSS temizligi.
+    $p_text = forum_sanitize_html(stripslashes($p_text));
+
     $p_date = $p["date"];
     $p_id = intval($p["id"]);
     $p_num = $offset + $idx + 1;
@@ -325,15 +392,15 @@ foreach ($posts as $idx => $p) {
     // Düşen / Seçilen Grup Rozeti — SADECE VERİ (HTML post.tpl'de)
     $g_id = intval($p["user_group"]);
     $g_name = "";
-    $g_style = "color: #4b5563; border: 1px solid #d1d5db; background-color: #f9fafb;";
+    $g_style = "color: var(--forum-text-secondary); border: 1px solid var(--forum-border-color); background-color: var(--forum-bg-subheader);";
     if (isset($user_group[$g_id])) {
         $g_name = htmlspecialchars($user_group[$g_id]['group_name'], ENT_QUOTES, "UTF-8");
         if ($g_id == 1) {
-            $g_style = 'color: #e11d48; border: 1px solid #fca5a5; background-color: #fff1f2;';
+            $g_style = 'color: #e11d48; border: 1px solid rgba(225,29,72,.35); background-color: rgba(225,29,72,.12);';
         } elseif ($g_id == 2) {
-            $g_style = 'color: #2563eb; border: 1px solid #93c5fd; background-color: #eff6ff;';
+            $g_style = 'color: #2563eb; border: 1px solid rgba(37,99,235,.35); background-color: rgba(37,99,235,.12);';
         } elseif ($g_id == 3) {
-            $g_style = 'color: #059669; border: 1px solid #6ee7b7; background-color: #ecfdf5;';
+            $g_style = 'color: #059669; border: 1px solid rgba(5,150,105,.35); background-color: rgba(5,150,105,.12);';
         }
     }
 
@@ -369,6 +436,86 @@ foreach ($posts as $idx => $p) {
     $tpl->set("{p_num}",   $p_num);
     $tpl->set("{likes}",    $likes);
     $tpl->set("{dislikes}", $dislikes);
+
+    // En iyi cevap blokları (bu mesaj için)
+    if ($best_post_id > 0 && $p_id === $best_post_id) {
+        $tpl->set("[is-best-answer]", "");
+        $tpl->set("[/is-best-answer]", "");
+    } else {
+        $tpl->set_block("'\\[is-best-answer\\](.*?)\\[/is-best-answer\\]'si", "");
+    }
+    if ($can_best) {
+        $tpl->set("[can-best]", "");
+        $tpl->set("[/can-best]", "");
+    } else {
+        $tpl->set_block("'\\[can-best\\](.*?)\\[/can-best\\]'si", "");
+    }
+
+    // Düzenleme geçmişi (edited indicator + history link)
+    if (!empty($forum_cfg["enable_edit_history"]) && !empty($p["updated_at"])) {
+        $tpl->set(
+            "{p_edited}",
+            ($lang["forum_edited_on"] ?? "Düzenlendi") .
+                ": " .
+                htmlspecialchars((string) $p["updated_at"], ENT_QUOTES, "UTF-8"),
+        );
+        $tpl->set("[p-edited]", "");
+        $tpl->set("[/p-edited]", "");
+    } else {
+        $tpl->set_block("'\\[p-edited\\](.*?)\\[/p-edited\\]'si", "");
+    }
+    $tpl->set(
+        "{p_history_url}",
+        $config["http_home_url"] . "index.php?do=forum&action=history&post_id=" . $p_id,
+    );
+    $p_uid = intval($p["user_id"]);
+    $can_hist =
+        !empty($forum_cfg["enable_edit_history"]) &&
+        $is_logged &&
+        ($p_uid === intval($member_id["user_id"]) || intval($member_id["user_group"]) <= 2 || $is_cat_mod);
+    if ($can_hist) {
+        $tpl->set("[can-history]", "");
+        $tpl->set("[/can-history]", "");
+    } else {
+        $tpl->set_block("'\\[can-history\\](.*?)\\[/can-history\\]'si", "");
+    }
+    if (!empty($forum_cfg["enable_quotes"])) {
+        $tpl->set("[can-quote]", "");
+        $tpl->set("[/can-quote]", "");
+    } else {
+        $tpl->set_block("'\\[can-quote\\](.*?)\\[/can-quote\\]'si", "");
+    }
+
+    // İMZA (Signature)
+    $p_sig_html = "";
+    $p_sig_raw = trim((string) ($p["signature"] ?? ""));
+    if ($p_sig_raw !== "") {
+        $p_sig_raw = forum_word_filter($p_sig_raw);
+        if (method_exists($parse, 'BB_Parse')) {
+            $p_sig_raw = $parse->BB_Parse($p_sig_raw, true);
+        }
+        // BBCode fallback (imzalar sıklıkla BBCode ile yazılır)
+        if (strpos($p_sig_raw, '[') !== false) {
+            $p_sig_raw = preg_replace('/\[b\](.*?)\[\/b\]/is', '<b>$1</b>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[i\](.*?)\[\/i\]/is', '<i>$1</i>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[u\](.*?)\[\/u\]/is', '<u>$1</u>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[s\](.*?)\[\/s\]/is', '<del>$1</del>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[url=(.*?)\](.*?)\[\/url\]/is', '<a href="$1" rel="nofollow">$2</a>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[url\](.*?)\[\/url\]/is', '<a href="$1" rel="nofollow">$1</a>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[img\](.*?)\[\/img\]/is', '<img src="$1" alt="">', $p_sig_raw);
+        }
+        $p_sig_html = forum_sanitize_html(stripslashes($p_sig_raw));
+    }
+    $tpl->set("{p_signature}", $p_sig_html);
+    if ($p_sig_html !== "" && (trim(strip_tags($p_sig_html)) !== "" || strpos($p_sig_html, "<img") !== false)) {
+        $tpl->set("[p-has-signature]", "");
+        $tpl->set("[/p-has-signature]", "");
+        $tpl->set_block("'\\[p-no-signature\\](.*?)\\[/p-no-signature\\]'si", "");
+    } else {
+        $tpl->set_block("'\\[p-has-signature\\](.*?)\\[/p-has-signature\\]'si", "");
+        $tpl->set("[p-no-signature]", "");
+        $tpl->set("[/p-no-signature]", "");
+    }
     // IP and GeoIP lookup
     $p_ip_val = trim($p["ip"] ?? "");
     $p_ip_html = $lang['forum_topic_not_specified'];
@@ -406,7 +553,7 @@ foreach ($posts as $idx => $p) {
             $ip_tools_lang = $lang['ip_tools'] ?? 'Kullanıcı Ara';
             $ip_ban_lang = $lang['ip_ban'] ?? 'IP Adresini Yasakla';
             
-            $p_ip_html = $flag_html . "<a onclick=\"return dropdownmenu(this, event, IPMenu('" . $p_ip_val . "', '" . $ip_info_lang . "', '" . $ip_tools_lang . "', '" . $ip_ban_lang . "'), '190px')\" href=\"https://www.nic.ru/whois/?searchWord={$p_ip_val}\" target=\"_blank\" class=\"mybb-ip-link\">{$p_ip_val}</a>";
+            $p_ip_html = $flag_html . "<a onclick=\"return dropdownmenu(this, event, IPMenu('" . $p_ip_val . "', '" . $ip_info_lang . "', '" . $ip_tools_lang . "', '" . $ip_ban_lang . "'), '190px')\" href=\"https://www.nic.ru/whois/?searchWord={$p_ip_val}\" target=\"_blank\" class=\"forum-ip-link\">{$p_ip_val}</a>";
         } else {
             // For guests or regular users, just show flag + raw IP (though they won't see it anyway due to post.tpl group tags)
             $p_ip_html = $flag_html . $p_ip_val;
@@ -510,7 +657,7 @@ foreach ($posts as $idx => $p) {
     // Düzenleme yetki kontrolü (Edit permission check)
     $can_edit = false;
     $is_post_owner = ($is_logged && intval($p['user_id']) === intval($member_id['user_id']));
-    $is_mod_user = ($is_logged && $member_id['user_group'] <= 3); // Admin (1), Mod (2), Editör (3)
+    $is_mod_user = ($is_logged && $member_id['user_group'] <= 2); // Admin (1), Moderatör (2)
     
     if ($is_logged) {
         if ($is_mod_user) {
@@ -553,6 +700,20 @@ foreach ($posts as $idx => $p) {
     }
 }
 
+// En iyi cevap özet kutusu
+$best_box_html = "";
+if ($best_post_id > 0 && !empty($forum_cfg["enable_best_answer"])) {
+    $best_link = forum_topic_post_url($tid, $topic["alt_name"], $best_post_id);
+    $best_box_html =
+        '<div class="forum-best-box"><i class="fa fa-check-circle" aria-hidden="true"></i> <b>' .
+        ($lang["forum_best_box"] ?? "En iyi cevap seçildi") .
+        '</b> <a href="' .
+        $best_link .
+        '">#' .
+        $best_post_id .
+        "</a></div>";
+}
+
 // -------------------------------------------------
 // 9.5 ANKET VE ETİKET SİSTEMİ (POLL & TAGS)
 // -------------------------------------------------
@@ -580,6 +741,12 @@ if ($poll && isset($poll['id'])) {
     
     // Oy verme işlemi
     if (isset($_POST['submit_poll_vote']) && !$has_voted && !$is_closed) {
+        // CSRF korumasi
+        if (!isset($_POST['user_hash']) || $_POST['user_hash'] !== $dle_login_hash) {
+            msgbox($lang['forum_csrf_title'], $lang['forum_csrf_desc']);
+            return;
+        }
+
         $selected_opts = $_POST['poll_options'] ?? [];
         if (!is_array($selected_opts)) {
             $selected_opts = [intval($selected_opts)];
@@ -589,6 +756,10 @@ if ($poll && isset($poll['id'])) {
         foreach ($selected_opts as $opt_id) {
             $opt_id = intval($opt_id);
             if ($opt_id > 0) {
+                // Secenek gercekten bu ankete mi ait? (baska anketin oyunu sisirmeyi engelle)
+                $opt_check = $db->super_query("SELECT id FROM " . PREFIX . "_forum_poll_options WHERE id = '{$opt_id}' AND poll_id = '{$pid}'");
+                if (empty($opt_check['id'])) continue;
+
                 $db->query("INSERT IGNORE INTO " . PREFIX . "_forum_poll_votes (poll_id, option_id, user_id, date) 
                             VALUES ('{$pid}', '{$opt_id}', '{$uid}', NOW())");
                 $db->query("UPDATE " . PREFIX . "_forum_poll_options SET votes = votes + 1 WHERE id = '{$opt_id}'");
@@ -611,15 +782,15 @@ if ($poll && isset($poll['id'])) {
         $total_votes += intval($opt_row['votes']);
     }
     
-    // Anket Arayüzünü Oluştur (Premium MyBB Tasarımı)
-    $poll_html .= '<div class="mybb-category-block mybb-poll-block">';
-    $poll_html .= '  <div class="mybb-cat-header"><span class="mybb-cat-title"><i class="fa fa-bar-chart" style="margin-right:6px;"></i> ' . $lang['forum_topic_poll_label'] . ' ' . htmlspecialchars($poll['question'], ENT_QUOTES, "UTF-8") . '</span></div>';
-    $poll_html .= '  <div class="mybb-poll-body">';
+    // Anket Arayüzünü Oluştur (Premium Forum Tasarımı)
+    $poll_html .= '<div class="forum-category-block forum-poll-block">';
+    $poll_html .= '  <div class="forum-cat-bar forum-cat-header"><h2 class="forum-cat-title"><i class="fa fa-bar-chart" aria-hidden="true"></i> ' . $lang['forum_topic_poll_label'] . ' ' . htmlspecialchars($poll['question'], ENT_QUOTES, "UTF-8") . '</h2></div>';
+    $poll_html .= '  <div class="forum-poll-body">';
     
     $view_results = isset($_GET['view_poll_results']) ? 1 : 0;
     if ($has_voted || $is_closed || $view_results) {
         // Sonuçları Göster
-        $poll_html .= '    <div class="mybb-poll-results">';
+        $poll_html .= '    <div class="forum-poll-results">';
         $rank = 0;
         foreach ($options as $opt) {
             $rank++;
@@ -627,42 +798,43 @@ if ($poll && isset($poll['id'])) {
             $pct = $total_votes > 0 ? round(($votes / $total_votes) * 100) : 0;
             
             // En yüksek oy alan seçenek farklı renk alsın
-            $bar_class = 'mybb-poll-bar-fill';
-            if ($pct >= 50) $bar_class .= ' mybb-poll-bar-high';
-            elseif ($pct >= 25) $bar_class .= ' mybb-poll-bar-mid';
+            $bar_class = 'forum-poll-bar-fill';
+            if ($pct >= 50) $bar_class .= ' forum-poll-bar-high';
+            elseif ($pct >= 25) $bar_class .= ' forum-poll-bar-mid';
             
-            $poll_html .= '      <div class="mybb-poll-option">';
-            $poll_html .= '        <div class="mybb-poll-option-head"><span class="mybb-poll-option-text">' . htmlspecialchars($opt['text'], ENT_QUOTES, "UTF-8") . '</span><span class="mybb-poll-option-stat">' . sprintf($lang['forum_topic_votes_pct'], $votes, $pct) . '</span></div>';
-            $poll_html .= '        <div class="mybb-poll-bar"><div class="' . $bar_class . '" style="width:' . $pct . '%"></div></div>';
+            $poll_html .= '      <div class="forum-poll-option">';
+            $poll_html .= '        <div class="forum-poll-option-head"><span class="forum-poll-option-text">' . htmlspecialchars($opt['text'], ENT_QUOTES, "UTF-8") . '</span><span class="forum-poll-option-stat">' . sprintf($lang['forum_topic_votes_pct'], $votes, $pct) . '</span></div>';
+            $poll_html .= '        <div class="forum-poll-bar"><div class="' . $bar_class . '" style="width:' . $pct . '%"></div></div>';
             $poll_html .= '      </div>';
         }
-        $poll_html .= '      <div class="mybb-poll-footer"><i class="fa fa-info-circle"></i> ' . $lang['forum_topic_total_votes'] . ' <strong>' . $total_votes . '</strong>';
+        $poll_html .= '      <div class="forum-poll-footer"><i class="fa fa-info-circle"></i> ' . $lang['forum_topic_total_votes'] . ' <strong>' . $total_votes . '</strong>';
         if ($is_closed) {
-            $poll_html .= ' <span class="mybb-poll-closed-badge">' . $lang['forum_topic_poll_closed'] . '</span>';
+            $poll_html .= ' <span class="forum-poll-closed-badge">' . $lang['forum_topic_poll_closed'] . '</span>';
         }
         $poll_html .= '      </div>';
         $poll_html .= '    </div>';
     } else {
         // Oylama Formunu Göster
-        $poll_html .= '    <form method="post" action="" class="mybb-poll-form">';
+        $poll_html .= '    <form method="post" action="" class="forum-poll-form">';
+        $poll_html .= '      <input type="hidden" name="user_hash" value="' . htmlspecialchars($dle_login_hash ?? "", ENT_QUOTES, "UTF-8") . '">';
         $input_type = $poll['multiple'] ? 'checkbox' : 'radio';
-        $max_lbl = $poll['multiple'] && $poll['max_choices'] > 1 ? ' <span class="mybb-poll-max-hint">(' . sprintf($lang['forum_topic_poll_max_choices'], intval($poll['max_choices'])) . ')</span>' : '';
+        $max_lbl = $poll['multiple'] && $poll['max_choices'] > 1 ? ' <span class="forum-poll-max-hint">(' . sprintf($lang['forum_topic_poll_max_choices'], intval($poll['max_choices'])) . ')</span>' : '';
         
-        $poll_html .= '      <div class="mybb-poll-vote-hint">' . $lang['forum_topic_poll_vote_hint'] . $max_lbl . '</div>';
-        $poll_html .= '      <div class="mybb-poll-options-list">';
+        $poll_html .= '      <div class="forum-poll-vote-hint">' . $lang['forum_topic_poll_vote_hint'] . $max_lbl . '</div>';
+        $poll_html .= '      <div class="forum-poll-options-list">';
         foreach ($options as $opt) {
-            $poll_html .= '        <label class="mybb-poll-vote-label">';
-            $poll_html .= '          <input type="' . $input_type . '" name="poll_options[]" value="' . $opt['id'] . '" class="mybb-poll-input">';
+            $poll_html .= '        <label class="forum-poll-vote-label">';
+            $poll_html .= '          <input type="' . $input_type . '" name="poll_options[]" value="' . $opt['id'] . '" class="forum-poll-input">';
             $poll_html .= '          <span>' . htmlspecialchars($opt['text'], ENT_QUOTES, "UTF-8") . '</span>';
             $poll_html .= '        </label>';
         }
         $poll_html .= '      </div>';
-        $poll_html .= '      <div class="mybb-poll-actions">';
-        $poll_html .= '        <button type="submit" name="submit_poll_vote" class="mybb-btn-action mybb-poll-submit-btn"><i class="fa fa-check"></i> ' . $lang['forum_topic_poll_submit'] . '</button>';
+        $poll_html .= '      <div class="forum-poll-actions">';
+        $poll_html .= '        <button type="submit" name="submit_poll_vote" class="forum-btn-action forum-poll-submit-btn"><i class="fa fa-check"></i> ' . $lang['forum_topic_poll_submit'] . '</button>';
         if ($is_logged) {
-            $poll_html .= '        <a href="?view_poll_results=1" class="mybb-poll-results-link"><i class="fa fa-eye"></i> ' . $lang['forum_topic_poll_view_results'] . '</a>';
+            $poll_html .= '        <a href="?view_poll_results=1" class="forum-poll-results-link"><i class="fa fa-eye"></i> ' . $lang['forum_topic_poll_view_results'] . '</a>';
         } else {
-            $poll_html .= '        <span class="mybb-poll-guest-hint">' . $lang['forum_topic_poll_login_required'] . '</span>';
+            $poll_html .= '        <span class="forum-poll-guest-hint">' . $lang['forum_topic_poll_login_required'] . '</span>';
         }
         $poll_html .= '      </div>';
         $poll_html .= '    </form>';
@@ -707,6 +879,126 @@ if (!$allow_post_reply) {
 }
 
 $tpl->load_template("forum/topic.tpl");
+forum_set_ui_lang($tpl, $lang);
+$tpl->set(
+    "{reply_captcha}",
+    function_exists("forum_captcha_active") && forum_captcha_active("reply")
+        ? forum_captcha_html()
+        : "",
+);
+
+// OKUNDU KAYDI (kalıcı okundu takibi)
+if ($is_logged && intval($member_id["user_id"]) > 0) {
+    $ruid = intval($member_id["user_id"]);
+    $rlast = intval($topic["last_post_id"]);
+    $db->query("INSERT INTO " . PREFIX . "_forum_readlog (user_id, topic_id, last_read_post, date)
+                VALUES ('{$ruid}', '{$tid}', '{$rlast}', NOW())
+                ON DUPLICATE KEY UPDATE last_read_post=VALUES(last_read_post), date=NOW()");
+}
+
+// -------------------------------------------------
+// KİM GÖRÜNTÜLÜYOR (who's viewing)
+// -------------------------------------------------
+$viewing_count = 0;
+$viewing_html = "";
+if (!empty($forum_cfg["enable_viewers"])) {
+if ($is_logged && intval($member_id["user_id"]) > 0) {
+    $vuid = intval($member_id["user_id"]);
+    $db->query(
+        "INSERT INTO " . PREFIX . "_forum_viewing (topic_id, user_id, date) VALUES ('{$tid}','{$vuid}',NOW())
+         ON DUPLICATE KEY UPDATE date=NOW()",
+    );
+}
+$db->query(
+    "DELETE FROM " . PREFIX . "_forum_viewing WHERE topic_id='{$tid}' AND date < NOW() - INTERVAL 10 MINUTE",
+);
+$vrow = $db->super_query(
+    "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_viewing WHERE topic_id='{$tid}' AND date >= NOW() - INTERVAL 2 MINUTE",
+);
+$viewing_count = intval($vrow["cnt"]);
+if ($viewing_count > 0) {
+    $vnames = [];
+    $db->query(
+        "SELECT u.user_id, u.name FROM " . PREFIX . "_forum_viewing v
+         INNER JOIN " . USERPREFIX . "_users u ON u.user_id = v.user_id
+         WHERE v.topic_id='{$tid}' AND v.date >= NOW() - INTERVAL 2 MINUTE
+         ORDER BY u.name ASC LIMIT 30",
+    );
+    while ($vr = $db->get_row()) {
+        $vnm = htmlspecialchars(stripslashes($vr["name"]), ENT_QUOTES, "UTF-8");
+        $vnames[] =
+            '<a href="' .
+            $config["http_home_url"] .
+            "index.php?do=forum&action=profile&id=" .
+            intval($vr["user_id"]) .
+            '">' .
+            $vnm .
+            "</a>";
+    }
+    $viewing_html = implode(", ", $vnames);
+}
+}
+
+// -------------------------------------------------
+// BENZER KONULAR (similar topics)
+// -------------------------------------------------
+$similar_html = "";
+if (!empty($forum_cfg["enable_similar"])) {
+$similar_rows = [];
+$similar_ids = [];
+$tag_ids = [];
+$db->query("SELECT tag_id FROM " . PREFIX . "_forum_topic_tags WHERE topic_id='{$tid}'");
+while ($tg = $db->get_row()) {
+    $tag_ids[] = intval($tg["tag_id"]);
+}
+if (!empty($tag_ids)) {
+    $tag_in = implode(",", $tag_ids);
+    $db->query(
+        "SELECT t.id, t.title, t.alt_name, t.replies, t.views, COUNT(*) AS shared
+         FROM " . PREFIX . "_forum_topic_tags tt
+         INNER JOIN " . PREFIX . "_forum_topics t ON t.id = tt.topic_id
+         WHERE tt.tag_id IN ({$tag_in}) AND tt.topic_id != '{$tid}'
+               AND t.is_deleted=0 AND t.is_approved=1
+         GROUP BY t.id
+         ORDER BY shared DESC, t.last_post_date DESC
+         LIMIT 5",
+    );
+    while ($sr = $db->get_row()) {
+        $similar_rows[] = $sr;
+        $similar_ids[] = intval($sr["id"]);
+    }
+}
+if (count($similar_rows) < 5) {
+    $exclude = $similar_ids;
+    $exclude[] = $tid;
+    $excl_in = implode(",", array_map("intval", $exclude));
+    $need = 5 - count($similar_rows);
+    $db->query(
+        "SELECT id, title, alt_name, replies, views FROM " . PREFIX . "_forum_topics
+         WHERE cat_id='" . intval($topic["cat_id"]) . "' AND id NOT IN ({$excl_in})
+               AND is_deleted=0 AND is_approved=1
+         ORDER BY last_post_date DESC LIMIT {$need}",
+    );
+    while ($sr = $db->get_row()) {
+        $similar_rows[] = $sr;
+    }
+}
+$similar_html = "";
+foreach ($similar_rows as $sr) {
+    $s_id = intval($sr["id"]);
+    $s_title = htmlspecialchars(stripslashes($sr["title"]), ENT_QUOTES, "UTF-8");
+    $s_url = $config["http_home_url"] . "forum/topic/" . $s_id . "-" . $sr["alt_name"] . ".html";
+    $s_meta =
+        intval($sr["replies"]) . " " . ($lang["forum_rss_replies"] ?? "cevap") .
+        " · " . intval($sr["views"]) . " " . ($lang["forum_rss_views"] ?? "görüntüleme");
+    $similar_html .=
+        '<a class="forum-similar__item" href="' . $s_url . '">' .
+        '<span class="forum-similar__title"><i class="fa fa-comment-o" aria-hidden="true"></i> ' . $s_title . '</span>' .
+        '<span class="forum-similar__meta">' . $s_meta . '</span>' .
+        "</a>";
+}
+}
+
 $tpl->set("{poll_block}", $poll_html);
 $tpl->set("{tags_block}", "");
 
@@ -722,11 +1014,33 @@ $tpl->set(
     "{pin_label}",
     $topic["is_pinned"] ? $lang['forum_topic_unpin'] : $lang['forum_topic_pin'],
 );
-$mod_visible = $member_id["user_group"] <= 2 ? "block" : "none";
+$mod_visible = $can_moderate_topic || $can_edit_topic ? "block" : "none";
 $tpl->set("{mod_display}", $mod_visible);
+$tpl->set(
+    "{mod_label}",
+    $can_moderate_topic ? $lang["forum_topic_mod_label"] : $lang["forum_topic_actions_label"],
+);
+$tpl->set(
+    "{topic_edit_url}",
+    $can_edit_topic
+        ? $config["http_home_url"] . "index.php?do=forum&action=edit&post_id=" . $first_post_id
+        : "",
+);
+if ($can_edit_topic) {
+    $tpl->set("[can-edit-topic]", "");
+    $tpl->set("[/can-edit-topic]", "");
+} else {
+    $tpl->set_block("'\\[can-edit-topic\\](.*?)\\[/can-edit-topic\\]'si", "");
+}
+if ($can_moderate_topic) {
+    $tpl->set("[can-moderate-topic]", "");
+    $tpl->set("[/can-moderate-topic]", "");
+} else {
+    $tpl->set_block("'\\[can-moderate-topic\\](.*?)\\[/can-moderate-topic\\]'si", "");
+}
 $tpl->set("{lock_label}", $topic["is_locked"] ? $lang['forum_topic_unlock'] : $lang['forum_topic_lock']);
 
-$allow_bump = $is_logged && ($member_id["user_group"] <= 2 || intval($topic["user_id"]) === intval($member_id["user_id"]));
+$allow_bump = $is_logged && (intval($member_id["user_group"]) <= 2 || $is_cat_mod || intval($topic["user_id"]) === intval($member_id["user_id"]));
 if ($allow_bump) {
     $tpl->set("[allow-bump]", "");
     $tpl->set("[/allow-bump]", "");
@@ -749,13 +1063,159 @@ if ($topic_is_locked) {
 }
 $tpl->set("{author_name}", htmlspecialchars($author_name, ENT_QUOTES, "UTF-8"));
 $tpl->set("{http_home_url}", $config["http_home_url"]);
+
+// ABONELİK DURUMU (Subscription state)
+$is_subscribed = false;
+if (!empty($forum_cfg["enable_subscriptions"]) && $is_logged && intval($member_id["user_id"]) > 0) {
+    $srow = $db->super_query("SELECT id FROM " . PREFIX . "_forum_subs WHERE topic_id='{$tid}' AND user_id='" . intval($member_id["user_id"]) . "'");
+    $is_subscribed = !empty($srow["id"]);
+}
+if ($is_subscribed) {
+    $tpl->set("[is-subscribed]", "");
+    $tpl->set("[/is-subscribed]", "");
+    $tpl->set_block("'\\[not-subscribed\\](.*?)\\[/not-subscribed\\]'si", "");
+} else {
+    $tpl->set_block("'\\[is-subscribed\\](.*?)\\[/is-subscribed\\]'si", "");
+    $tpl->set("[not-subscribed]", "");
+    $tpl->set("[/not-subscribed]", "");
+}
+
+// KONU PUANLAMA (5 yıldız)
+$rating_html = "";
+if (!empty($forum_cfg["enable_topic_rating"])) {
+    $uid_cur = $is_logged ? intval($member_id["user_id"]) : 0;
+
+    $rrow = $db->super_query(
+        "SELECT COUNT(*) AS cnt, AVG(rating) AS avg FROM " . PREFIX . "_forum_topic_ratings WHERE topic_id='{$tid}'",
+    );
+    $rating_count = intval($rrow["cnt"]);
+    $rating_avg = $rating_count > 0 ? round(floatval($rrow["avg"]), 1) : 0;
+
+    $rating_user = 0;
+    if ($uid_cur > 0) {
+        $ur = $db->super_query(
+            "SELECT rating FROM " . PREFIX . "_forum_topic_ratings WHERE topic_id='{$tid}' AND user_id='{$uid_cur}'",
+        );
+        $rating_user = intval($ur["rating"] ?? 0);
+    }
+
+    $can_rate =
+        $uid_cur > 0 && $uid_cur !== intval($topic["user_id"]) && !$topic_is_locked;
+
+    $meta_txt =
+        $rating_count > 0
+            ? "(" .
+                $rating_count .
+                " " .
+                ($lang["forum_rating_votes"] ?? "oy") .
+                " · " .
+                ($lang["forum_rating_avg"] ?? "ort.") .
+                " " .
+                number_format($rating_avg, 1) .
+                ")"
+            : $lang["forum_rating_none"] ?? "Henüz puan yok";
+
+    $rating_html =
+        '<div class="forum-rating" id="forum-rating">' .
+        '<span class="forum-rating__label"><i class="fa fa-star" aria-hidden="true"></i> ' .
+        ($lang["forum_rating_label"] ?? "Konu Puanı") .
+        ':</span>' .
+        '<span class="forum-rating__avg" id="forum-rating-avg">' .
+        forum_rating_stars_html($rating_avg) .
+        "</span>" .
+        '<span class="forum-rating__meta" id="forum-rating-meta">' .
+        htmlspecialchars($meta_txt, ENT_QUOTES, "UTF-8") .
+        "</span>";
+
+    if ($can_rate) {
+        $pick_label =
+            $rating_user > 0
+                ? $lang["forum_rating_your"] ?? "Puanınız"
+                : $lang["forum_rating_rate"] ?? "Puanla";
+        $rating_html .=
+            '<span class="forum-rating__pick">' .
+            htmlspecialchars($pick_label, ENT_QUOTES, "UTF-8") .
+            ': <span id="forum-rating-pick-stars">' .
+            forum_rating_stars_html($rating_avg, true, $rating_user, $tid) .
+            "</span></span>";
+    } elseif ($uid_cur > 0 && $uid_cur === intval($topic["user_id"])) {
+        $rating_html .=
+            '<span class="forum-rating__pick forum-rating__pick--dim">' .
+            ($lang["forum_rating_self"] ?? "Kendi konunuzu puanlayamazsınız") .
+            "</span>";
+    } elseif (!$is_logged) {
+        $rating_html .=
+            '<span class="forum-rating__pick forum-rating__pick--dim">' .
+            ($lang["forum_rating_login"] ?? "Puanlamak için giriş yapın") .
+            "</span>";
+    }
+
+    $rating_html .= "</div>";
+}
+$tpl->set("{topic_rating}", $rating_html);
+
+// KONU TAŞIMA — kategori seçenekleri
+$move_cat_opts = "";
+$db->query("SELECT id, name FROM " . PREFIX . "_forum_cats ORDER BY posi ASC, name ASC");
+while ($mcr = $db->get_row()) {
+    $mcid = intval($mcr["id"]);
+    $msel = ($mcid === intval($topic["cat_id"])) ? " selected" : "";
+    $move_cat_opts .= '<option value="' . $mcid . '"' . $msel . '>' . htmlspecialchars(stripslashes($mcr["name"]), ENT_QUOTES, "UTF-8") . '</option>';
+}
+$tpl->set("{move_category_options}", $move_cat_opts);
 $tpl->set("{dle_login_hash}", $dle_login_hash);
+$tpl->set("{drafts_enabled}", !empty($forum_cfg["enable_drafts"]) ? "true" : "false");
+
+// ÇÖZÜLDÜ İŞARETİ
+$topic_is_solved = !empty($forum_cfg["enable_solved"]) && !empty($topic["is_solved"]);
+$can_solve =
+    $is_logged &&
+    !empty($forum_cfg["enable_solved"]) &&
+    (intval($member_id["user_id"]) === intval($topic["user_id"]) ||
+        intval($member_id["user_group"]) <= 2 ||
+        $is_cat_mod);
+$tpl->set(
+    "{solve_label}",
+    $topic_is_solved
+        ? $lang["forum_unsolve"] ?? "Çözüldü işaretini kaldır"
+        : $lang["forum_solve"] ?? "Çözüldü olarak işaretle",
+);
+if ($can_solve) {
+    $tpl->set("[can-solve]", "");
+    $tpl->set("[/can-solve]", "");
+} else {
+    $tpl->set_block("'\\[can-solve\\](.*?)\\[/can-solve\\]'si", "");
+}
+if ($topic_is_solved) {
+    $tpl->set("[topic-solved]", "");
+    $tpl->set("[/topic-solved]", "");
+} else {
+    $tpl->set_block("'\\[topic-solved\\](.*?)\\[/topic-solved\\]'si", "");
+}
+
+// BENZER KONULAR + KİM GÖRÜNTÜLÜYOR
+$tpl->set("{similar_topics}", $similar_html);
+if ($similar_html !== "") {
+    $tpl->set("[has-similar]", "");
+    $tpl->set("[/has-similar]", "");
+} else {
+    $tpl->set_block("'\\[has-similar\\](.*?)\\[/has-similar\\]'si", "");
+}
+$tpl->set("{viewing_users}", $viewing_html);
+$tpl->set("{viewing_count}", $viewing_count);
+if ($viewing_count > 0) {
+    $tpl->set("[has-viewers]", "");
+    $tpl->set("[/has-viewers]", "");
+} else {
+    $tpl->set_block("'\\[has-viewers\\](.*?)\\[/has-viewers\\]'si", "");
+}
 $tpl->set("{lang_code}", $lang["language_code"]);
 $tpl->set("{lang_dir}", $lang["direction"]);
 
 $tpl->set("{reply_editor}", $wysiwyg);
 
 $tpl->set("{post_rows}", $post_html);
+$tpl->set("{best_answer_box}", $best_box_html);
 
 // Sayfalama
 $pagination = "";

@@ -25,7 +25,7 @@ $subaction = isset($_REQUEST["subaction"]) ? totranslit($_REQUEST["subaction"]) 
 // POST: TOPLU İŞLEMLER (MASS ACTIONS)
 // -------------------------------------------------
 if (isset($_POST["mass_action_submit"])) {
-    if ($_POST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_POST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -89,28 +89,29 @@ if (isset($_POST["mass_action_submit"])) {
 // POST: TEKİL DÜZENLEME KAYDET (SAVE SINGLE TOPIC)
 // -------------------------------------------------
 if (isset($_POST["save_topic"]) && $id > 0) {
-    if ($_POST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_POST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
 
-    $title = $db->safesql(trim(htmlspecialchars($_POST["title"], ENT_QUOTES, "UTF-8")));
-    $alt_name = trim($_POST["alt_name"]);
+    // Cift escape olmamasi icin ham deger kaydedilir; cikista htmlspecialchars uygulanir
+    $title = $db->safesql(trim($_POST["title"] ?? ""));
+    $alt_name = trim($_POST["alt_name"] ?? "");
     if (empty($alt_name)) {
-        $alt_name = totranslit($_POST["title"]);
+        $alt_name = totranslit($_POST["title"] ?? "");
     } else {
         $alt_name = totranslit($alt_name);
     }
     $alt_name = $db->safesql($alt_name);
 
-    $cat_id = intval($_POST["cat_id"]);
-    $prefix_id = intval($_POST["prefix_id"]);
+    $cat_id = intval($_POST["cat_id"] ?? 0);
+    $prefix_id = intval($_POST["prefix_id"] ?? 0);
     $is_pinned = isset($_POST["is_pinned"]) ? 1 : 0;
     $is_locked = isset($_POST["is_locked"]) ? 1 : 0;
     $is_approved = isset($_POST["is_approved"]) ? 1 : 0;
     $is_deleted = isset($_POST["is_deleted"]) ? 1 : 0;
 
-    $author_name = $db->safesql(trim($_POST["author"]));
+    $author_name = $db->safesql(trim($_POST["author"] ?? ""));
     $user_row = $db->super_query("SELECT user_id FROM " . PREFIX . "_users WHERE name='{$author_name}'");
     $user_id = $user_row["user_id"] ? intval($user_row["user_id"]) : 0;
 
@@ -149,7 +150,7 @@ if (isset($_POST["save_topic"]) && $id > 0) {
     // İlk mesajı bul ve metnini güncelle
     $first_post = $db->super_query("SELECT id FROM " . PREFIX . "_forum_posts WHERE topic_id='{$id}' ORDER BY id ASC LIMIT 1");
     if ($first_post["id"]) {
-        $post_text = isset($_POST["text"]) ? $_POST["text"] : (isset($_POST["full_story"]) ? $_POST["full_story"] : $_POST["post_text"]);
+        $post_text = $_POST["text"] ?? ($_POST["full_story"] ?? ($_POST["post_text"] ?? ""));
         $post_text = $db->safesql(trim($post_text));
         $db->query("UPDATE " . PREFIX . "_forum_posts SET text='{$post_text}', is_approved='{$is_approved}', is_deleted='{$is_deleted}', user_id='{$user_id}' WHERE id='{$first_post["id"]}'");
     }
@@ -320,12 +321,12 @@ if ($subaction == "edit" && $id > 0) {
                 <li><a href="#tabaccess" data-toggle="tab"><i class="fa fa-lock position-left"></i> <?php echo $lang['forum_topic_tab_access']; ?></a></li>
             </ul>
             <div class="heading-elements not-collapsible">
-                <a href="?mod=forum&action=topics" class="btn btn-default btn-xs"><i class="fa fa-arrow-left position-left"></i> <?php echo $lang['forum_topic_btn_back']; ?></a>
+                <a href="?mod=forum&action=topics" class="btn bg-grey-400 btn-xs"><i class="fa fa-arrow-left position-left"></i> <?php echo $lang['forum_topic_btn_back']; ?></a>
             </div>
         </div>
         
         <form method="post" action="?mod=forum&action=topics&subaction=edit&id=<?php echo $id; ?>" autocomplete="off" class="form-horizontal" onsubmit="if(typeof tinyMCE !== 'undefined') { tinyMCE.triggerSave(); }">
-            <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+            <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
 
             <div class="panel-tab-content tab-content">
                 <div class="tab-pane active" id="tabhome">
@@ -344,7 +345,7 @@ if ($subaction == "edit" && $id > 0) {
                         <div class="input-group">
                             <input type="text" name="alt_name" id="alt_name" class="form-control" value="<?php echo htmlspecialchars($topic["alt_name"], ENT_QUOTES, "UTF-8"); ?>">
                             <span class="input-group-btn">
-                                <button type="button" class="btn btn-default" onclick="gen_alt_name(); return false;"><i class="fa fa-refresh"></i> <?php echo $lang['forum_topic_btn_generate']; ?></button>
+                                <button type="button" class="btn bg-grey-400" onclick="gen_alt_name(); return false;"><i class="fa fa-refresh"></i> <?php echo $lang['forum_topic_btn_generate']; ?></button>
                             </span>
                         </div>
                     </div>
@@ -549,10 +550,10 @@ if ($subaction == "edit" && $id > 0) {
                 </div>
             </div>
 
-            <div class="panel-footer" style="padding: 15px; background: #fafafa; border-top: 1px solid #e5e7eb;">
+            <div class="panel-footer">
                 <div class="col-sm-offset-2 col-sm-10">
                     <button type="submit" name="save_topic" class="btn bg-teal btn-raised btn-sm"><i class="fa fa-check position-left"></i> <?php echo $lang['forum_btn_save']; ?></button>
-                    <a href="?mod=forum&action=topics" class="btn btn-default btn-raised btn-sm" style="margin-left: 10px;"><i class="fa fa-times position-left"></i> <?php echo $lang['forum_btn_cancel']; ?></a>
+                    <a href="?mod=forum&action=topics" class="btn bg-grey-400 btn-raised btn-sm" style="margin-left: 10px;"><i class="fa fa-times position-left"></i> <?php echo $lang['forum_btn_cancel']; ?></a>
                 </div>
             </div>
         </form>
@@ -848,7 +849,7 @@ $all_topics_count = intval($total_row["count"]);
     </div>
 <?php else: ?>
     <form action="?mod=forum&action=topics" method="post" name="topics_form">
-        <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+        <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
         <div class="panel panel-default">
             <div class="panel-heading">
                 <?php echo $lang['forum_topic_list']; ?> (<?php echo $lang['forum_topic_showing']; ?> <?php echo $entries_showed; ?> — <?php echo $lang['forum_topic_total_found']; ?> <?php echo $all_topics_count; ?>)

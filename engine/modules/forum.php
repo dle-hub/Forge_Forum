@@ -41,10 +41,8 @@ if (file_exists($init_file)) {
 // Foruma ozel premium breadcrumb
 $breadcrumb_html = "";
 if (is_array($forum_speedbar) && count($forum_speedbar) > 0) {
-    $breadcrumb_html .=
-        '<nav class="flex mb-5 px-4 py-3 text-gray-700 bg-white border border-gray-200 rounded-lg shadow-sm" aria-label="Breadcrumb">';
-    $breadcrumb_html .=
-        '<ol class="inline-flex items-center space-x-1 md:space-x-3 list-none p-0 m-0">';
+    $breadcrumb_html .= '<nav class="forum-breadcrumb" aria-label="Breadcrumb">';
+    $breadcrumb_html .= '<ol class="forum-breadcrumb__list">';
 
     $counter = 0;
     $total = count($forum_speedbar);
@@ -56,33 +54,23 @@ if (is_array($forum_speedbar) && count($forum_speedbar) > 0) {
             ENT_QUOTES,
             "UTF-8",
         );
-        $breadcrumb_html .= '<li class="inline-flex items-center">';
+        $breadcrumb_html .= '<li class="forum-breadcrumb__item">';
 
         if ($counter > 1) {
             $breadcrumb_html .=
-                '<svg class="w-6 h-6 text-gray-400 mx-1" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path></svg>';
+                '<span class="forum-breadcrumb__sep" aria-hidden="true">&rsaquo;</span>';
         }
 
         if ($url !== "" && $counter < $total) {
-            if ($counter == 1) {
+            $breadcrumb_html .= '<a href="' . $url . '">';
+            if ($counter === 1) {
                 $breadcrumb_html .=
-                    '<a href="' .
-                    $url .
-                    '" class="inline-flex items-center text-sm font-medium text-gray-700 hover:text-blue-600 transition">';
-                $breadcrumb_html .=
-                    '<svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path d="M10.707 2.293a1 1 0 00-1.414 0l-7 7a1 1 0 001.414 1.414L4 10.414V17a1 1 0 001 1h2a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1h2a1 1 0 001-1v-6.586l.707.707a1 1 0 001.414-1.414l-7-7z"></path></svg>';
-                $breadcrumb_html .= $title . "</a>";
-            } else {
-                $breadcrumb_html .=
-                    '<a href="' .
-                    $url .
-                    '" class="text-sm font-medium text-gray-700 hover:text-blue-600 transition">' .
-                    $title .
-                    "</a>";
+                    '<i class="fa fa-home forum-breadcrumb__home" aria-hidden="true"></i>';
             }
+            $breadcrumb_html .= $title . "</a>";
         } else {
             $breadcrumb_html .=
-                '<span class="text-sm font-semibold text-gray-500 truncate max-w-xs md:max-w-md block" aria-current="page">' .
+                '<span class="forum-breadcrumb__current" aria-current="page">' .
                 $title .
                 "</span>";
         }

@@ -22,7 +22,7 @@ templates/{skin}/forum/
 ├── search.tpl             → Arama sayfası
 ├── notifications.tpl      → Bildirimler listesi
 ├── notification_row.tpl   → Tek bildirim satırı
-├── forum.css              → Forum stilleri (MyBB tarzı)
+├── forum.css              → Forum stilleri (Forum tarzı)
 └── forum.js               → Kategori kartı aç/kapa vb.
 ```
 
@@ -96,7 +96,7 @@ Bu etiketler `init.php` ve `forum.php` üzerinden tüm forum sayfalarına uygula
 Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlandığında `init.php` şunu ekler:
 
 ```css
-.forum-wrapper { --mybb-bg-header: #1d2d44; }
+.forum-wrapper { --forum-bg-header: #1d2d44; }
 ```
 
 ---
@@ -174,7 +174,7 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 
 | Etiket | Ne işe yarar |
 |--------|----------------|
-| `{t_row_class}` | Satır CSS sınıfı (`mybb-row-unread` vb.). |
+| `{t_row_class}` | Satır CSS sınıfı (`forum-row-unread` vb.). |
 | `{t_title_style}` | Başlık inline stil (okunmamış kalın mavi vb.). |
 | `{t_title}` | Konu başlığı (escape edilmiş). |
 | `{t_url}` | Konu URL'si (`.html`). |
@@ -290,7 +290,7 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `[complaint]` | Şikayet butonu göster |
 | `[group=1,2]` | Admin / moderatör (IP, toplu seçim) |
 
-**Yıldızlar:** `.mybb-author-stars[data-stars="{p_star_count}"][data-color="{p_star_color}"]` — `topic.tpl` içindeki JS ile doldurulur.
+**Yıldızlar:** `.forum-author-stars[data-stars="{p_star_count}"][data-color="{p_star_color}"]` — `topic.tpl` içindeki JS ile doldurulur.
 
 ---
 
@@ -454,14 +454,14 @@ Tema özelleştirmesi için `:root` / `.forum-wrapper` altında:
 
 | Değişken | Varsayılan | Kullanım |
 |----------|------------|----------|
-| `--mybb-bg-header` | `#1d2d44` | Kategori kart başlığı (admin ayarından override) |
-| `--mybb-bg-body` | `#ebf0f6` | Sayfa arka planı |
-| `--mybb-bg-card` | `#ffffff` | Kart arka planı |
-| `--mybb-bg-subheader` | `#ebf2fb` | Alt başlık şeritleri |
-| `--mybb-text-primary` | `#1d2d44` | Ana metin |
-| `--mybb-text-muted` | `#8c9ba5` | Soluk metin |
-| `--mybb-border-color` | `#c9d3e0` | Kenarlıklar |
-| `--mybb-radius-sm/md/lg` | `4/6/8px` | Köşe yuvarlaklığı |
+| `--forum-bg-header` | `#1d2d44` | Kategori kart başlığı (admin ayarından override) |
+| `--forum-bg-body` | `#ebf0f6` | Sayfa arka planı |
+| `--forum-bg-card` | `#ffffff` | Kart arka planı |
+| `--forum-bg-subheader` | `#ebf2fb` | Alt başlık şeritleri |
+| `--forum-text-primary` | `#1d2d44` | Ana metin |
+| `--forum-text-muted` | `#8c9ba5` | Soluk metin |
+| `--forum-border-color` | `#c9d3e0` | Kenarlıklar |
+| `--forum-radius-sm/md/lg` | `4/6/8px` | Köşe yuvarlaklığı |
 
 **Editör mavi şerit (DLE uyumu):**
 
@@ -530,7 +530,7 @@ DLE site dili ne ise o klasördeki `forum.lng` otomatik yüklenir (`engine/modul
 
 ## 12. Sürüm
 
-- **Eklenti:** Forge Forum v1.0  
+- **Eklenti:** Forge Forum v1.1.0  
 - **Kılavuz:** Şablon etiketleri — Forge Forum motoru ile uyumlu
 
 Sorular ve güncellemeler için: [forge_forum.xml](forge_forum.xml) ve `engine/modules/forum/actions/` altındaki action dosyalarına bakın.

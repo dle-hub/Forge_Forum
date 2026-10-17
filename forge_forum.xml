@@ -4,7 +4,7 @@
 	<description
     >Modüler Admin Panelli, OOP, AJAX, SEO Uyumlu Forum Sistemi</description>
 	<icon>public/adminpanel/images/forum.png</icon>
-	<version>1.0.0</version>
+	<version>1.1.0</version>
 	<dleversion>19.1</dleversion>
 	<versioncompare />
 	<upgradeurl>https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json</upgradeurl>
@@ -40,7 +40,11 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_topics` (
   `replies` int(11) DEFAULT '0',
   `is_pinned` tinyint(1) DEFAULT '0',
   `is_locked` tinyint(1) DEFAULT '0',
+  `is_solved` tinyint(1) NOT NULL DEFAULT '0',
+  `best_post_id` int(11) NOT NULL DEFAULT '0',
   `is_deleted` tinyint(1) DEFAULT '0',
+  `is_approved` tinyint(1) NOT NULL DEFAULT '1',
+  `access` varchar(255) NOT NULL DEFAULT '',
   `last_bump_date` datetime DEFAULT NULL,
   `last_post_id` int(11) DEFAULT '0',
   `last_user_id` int(11) DEFAULT '0',
@@ -104,6 +108,70 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_subs` (
   `date` datetime NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `user_topic` (`user_id`,`topic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_topic_ratings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `topic_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `rating` tinyint(1) NOT NULL DEFAULT '0',
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `topic_user` (`topic_id`,`user_id`),
+  KEY `topic_id` (`topic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_viewing` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `topic_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `topic_user` (`topic_id`,`user_id`),
+  KEY `topic_id` (`topic_id`),
+  KEY `date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_follows` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `target_id` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_target` (`user_id`,`target_id`),
+  KEY `target_id` (`target_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_drafts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `type` varchar(20) NOT NULL DEFAULT 'reply',
+  `topic_id` int(11) NOT NULL DEFAULT '0',
+  `cat_id` int(11) NOT NULL DEFAULT '0',
+  `title` varchar(255) NOT NULL DEFAULT '',
+  `text` mediumtext NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_type_topic` (`user_id`,`type`,`topic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_cat_mods` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `cat_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `cat_user` (`cat_id`,`user_id`),
+  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_cat_subs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `cat_id` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_cat` (`user_id`,`cat_id`),
+  KEY `cat_id` (`cat_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS `{prefix}_forum_likes` (
@@ -300,11 +368,6 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_promotions` (
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
-ALTER TABLE `{prefix}_forum_topics` ADD COLUMN IF NOT EXISTS `is_approved` tinyint(1) NOT NULL DEFAULT '1';
-ALTER TABLE `{prefix}_users` ADD COLUMN IF NOT EXISTS `forum_points` INT(11) DEFAULT '0';
-ALTER TABLE `{prefix}_users` ADD COLUMN IF NOT EXISTS `forum_rank_id` INT(11) DEFAULT '0';
-ALTER TABLE `{prefix}_users` ADD COLUMN IF NOT EXISTS `forum_post_count` INT(11) DEFAULT '0';
-
 INSERT IGNORE INTO `{prefix}_forum_settings` (`name`, `value`) VALUES
 ('topics_per_page', '20'),
 ('posts_per_page', '15'),
@@ -321,6 +384,19 @@ INSERT IGNORE INTO `{prefix}_forum_settings` (`name`, `value`) VALUES
 ('enable_dislikes', '1'),
 ('enable_notifications', '1'),
 ('enable_subscriptions', '1'),
+('enable_email_notify', '1'),
+('enable_topic_rating', '1'),
+('enable_rss', '1'),
+('enable_sitemap', '1'),
+('enable_solved', '1'),
+('enable_best_answer', '1'),
+('enable_similar', '1'),
+('enable_viewers', '1'),
+('enable_online', '1'),
+('enable_follow', '1'),
+('enable_drafts', '1'),
+('enable_edit_history', '1'),
+('enable_opengraph', '1'),
 ('enable_ranks', '1');
 
 INSERT IGNORE INTO `{prefix}_forum_ranks` (`title`, `points`, `color`, `icon`, `badge_text`) VALUES
@@ -335,9 +411,7 @@ INSERT IGNORE INTO `{prefix}_admin_sections`
 VALUES
 ('forum', 'Forum Yönetimi', 'Forge Forum', 'forum.png', '1,2');]]></mysqlinstall>
 	<mysqlupgrade
-    ><![CDATA[ALTER TABLE `{prefix}_forum_topics` ADD COLUMN IF NOT EXISTS `is_approved` tinyint(1) NOT NULL DEFAULT '1';
-
-CREATE TABLE IF NOT EXISTS `{prefix}_forum_prefixes` (
+    ><![CDATA[CREATE TABLE IF NOT EXISTS `{prefix}_forum_prefixes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `name` varchar(100) NOT NULL,
   `color` varchar(20) DEFAULT '#3498db',
@@ -434,7 +508,71 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_uploads` (
   KEY `user_id` (`user_id`),
   KEY `post_id` (`post_id`),
   KEY `date` (`date`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;]]></mysqlupgrade>
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_topic_ratings` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `topic_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `rating` tinyint(1) NOT NULL DEFAULT '0',
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `topic_user` (`topic_id`,`user_id`),
+  KEY `topic_id` (`topic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_viewing` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `topic_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `topic_user` (`topic_id`,`user_id`),
+  KEY `topic_id` (`topic_id`),
+  KEY `date` (`date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_follows` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `target_id` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_target` (`user_id`,`target_id`),
+  KEY `target_id` (`target_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_drafts` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `type` varchar(20) NOT NULL DEFAULT 'reply',
+  `topic_id` int(11) NOT NULL DEFAULT '0',
+  `cat_id` int(11) NOT NULL DEFAULT '0',
+  `title` varchar(255) NOT NULL DEFAULT '',
+  `text` mediumtext NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_type_topic` (`user_id`,`type`,`topic_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_cat_mods` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `cat_id` int(11) NOT NULL,
+  `user_id` int(11) NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `cat_user` (`cat_id`,`user_id`),
+  KEY `user_id` (`user_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS `{prefix}_forum_cat_subs` (
+  `id` int(11) NOT NULL AUTO_INCREMENT,
+  `user_id` int(11) NOT NULL,
+  `cat_id` int(11) NOT NULL,
+  `date` datetime NOT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `user_cat` (`user_id`,`cat_id`),
+  KEY `cat_id` (`cat_id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;]]></mysqlupgrade>
 	<mysqlenable
     ><![CDATA[INSERT IGNORE INTO `{prefix}_admin_sections` (`name`, `title`, `descr`, `icon`, `allow_groups`) VALUES ('forum', 'Forum Yönetimi', 'Forge Forum', 'forum.png', '1,2');]]></mysqlenable>
 	<mysqldisable
@@ -459,20 +597,17 @@ DROP TABLE IF EXISTS `{prefix}_forum_edit_history`;
 DROP TABLE IF EXISTS `{prefix}_forum_readlog`;
 DROP TABLE IF EXISTS `{prefix}_forum_likes`;
 DROP TABLE IF EXISTS `{prefix}_forum_subs`;
+DROP TABLE IF EXISTS `{prefix}_forum_cat_subs`;
 DROP TABLE IF EXISTS `{prefix}_forum_ranks`;
 DROP TABLE IF EXISTS `{prefix}_forum_notifs`;
 DROP TABLE IF EXISTS `{prefix}_forum_posts`;
 DROP TABLE IF EXISTS `{prefix}_forum_topics`;
 DROP TABLE IF EXISTS `{prefix}_forum_cats`;
 
-ALTER TABLE `{prefix}_users` DROP COLUMN IF EXISTS `forum_post_count`;
-ALTER TABLE `{prefix}_users` DROP COLUMN IF EXISTS `forum_rank_id`;
-ALTER TABLE `{prefix}_users` DROP COLUMN IF EXISTS `forum_points`;
-
 DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldelete>
 	<phpinstall
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
     foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
 
     DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
@@ -488,35 +623,9 @@ DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldelete>
     DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
     DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
     DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
-    DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
-
-    if (is_array(DLEUrl::$rules)) {
-        $custom_rules = []; $other_rules = [];
-        foreach(DLEUrl::$rules as $k => $v) {
-            if (strpos($k, 'custom.forum_') === 0) { $custom_rules[$k] = $v; } else { $other_rules[$k] = $v; }
-        }
-        DLEUrl::$rules = array_merge($custom_rules, $other_rules);
-        DLEUrl::SaveRules(DLEUrl::$rules);
-    }
-}]]></phpinstall>
-	<phpupgrade
-    ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id'];
-    foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
-
-    DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
-    DLEUrl::AddRule('forum_new_topic', '/forum/new-topic/',          '/index.php?do=forum&action=new_topic');
-    DLEUrl::AddRule('forum_new_topic_cat', '/forum/new-topic/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=new_topic&cat={category}');
-    DLEUrl::AddRule('forum_reply',     '/forum/reply/',              '/index.php?do=forum&action=reply');
-    DLEUrl::AddRule('forum_reply_id',  '/forum/reply/{newsid}/',     '/index.php?do=forum&action=reply&topic_id={newsid}');
-    DLEUrl::AddRule('forum_search',    '/forum/search/',             '/index.php?do=forum&action=search');
-    DLEUrl::AddRule('forum_edit',      '/forum/edit/{newsid}/',      '/index.php?do=forum&action=edit&id={newsid}');
-    DLEUrl::AddRule('forum_profile',   '/forum/user/{user}/',        '/index.php?do=forum&action=profile&user={user}');
-    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
-    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name}/', '/index.php?do=forum&action=topic&id={newsid}');
-    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
-    DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
-    DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
+    DLEUrl::AddRule('forum_tag', '/forum/etiket/{tag}/', '/index.php?do=forum&action=tag&tag={tag}');
+    DLEUrl::AddRule('forum_rss', '/forum/rss/', '/index.php?do=forum&action=feed');
+    DLEUrl::AddRule('forum_rss_cat', '/forum/rss/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=feed&cat={category}');
     DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
 
     if (is_array(DLEUrl::$rules)) {
@@ -528,10 +637,27 @@ DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldelete>
         DLEUrl::SaveRules(DLEUrl::$rules);
     }
 }
-$db->query("UPDATE " . PREFIX . "_plugins SET upgradeurl='https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json' WHERE name='Forge Forum'");]]></phpupgrade>
-	<phpenable
+
+// MySQL/MariaDB uyumlu kolon garantisi (ADD COLUMN IF NOT EXISTS yalnizca MariaDB'de vardir)
+$__ff_columns = array(
+    array(PREFIX . "_forum_topics", "is_approved", "ADD COLUMN `is_approved` tinyint(1) NOT NULL DEFAULT '1' AFTER `is_deleted`"),
+    array(PREFIX . "_forum_topics", "access", "ADD COLUMN `access` varchar(255) NOT NULL DEFAULT '' AFTER `is_approved`"),
+    array(PREFIX . "_forum_topics", "is_solved", "ADD COLUMN `is_solved` tinyint(1) NOT NULL DEFAULT '0' AFTER `is_locked`"),
+    array(PREFIX . "_forum_topics", "best_post_id", "ADD COLUMN `best_post_id` int(11) NOT NULL DEFAULT '0' AFTER `is_solved`"),
+    array(USERPREFIX . "_users", "forum_points", "ADD COLUMN `forum_points` INT(11) DEFAULT '0'"),
+    array(USERPREFIX . "_users", "forum_rank_id", "ADD COLUMN `forum_rank_id` INT(11) DEFAULT '0'"),
+    array(USERPREFIX . "_users", "forum_post_count", "ADD COLUMN `forum_post_count` INT(11) DEFAULT '0'"),
+);
+foreach ($__ff_columns as $__ff_col) {
+    $__ff_has = $db->super_query("SHOW COLUMNS FROM `" . $__ff_col[0] . "` LIKE '" . $__ff_col[1] . "'");
+    if (!$__ff_has) {
+        $db->query("ALTER TABLE `" . $__ff_col[0] . "` " . $__ff_col[2]);
+    }
+}
+unset($__ff_columns, $__ff_col, $__ff_has);]]></phpinstall>
+	<phpupgrade
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
     foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
 
     DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
@@ -547,6 +673,60 @@ $db->query("UPDATE " . PREFIX . "_plugins SET upgradeurl='https://raw.githubuser
     DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
     DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
     DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
+    DLEUrl::AddRule('forum_tag', '/forum/etiket/{tag}/', '/index.php?do=forum&action=tag&tag={tag}');
+    DLEUrl::AddRule('forum_rss', '/forum/rss/', '/index.php?do=forum&action=feed');
+    DLEUrl::AddRule('forum_rss_cat', '/forum/rss/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=feed&cat={category}');
+    DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
+
+    if (is_array(DLEUrl::$rules)) {
+        $custom_rules = []; $other_rules = [];
+        foreach(DLEUrl::$rules as $k => $v) {
+            if (strpos($k, 'custom.forum_') === 0) { $custom_rules[$k] = $v; } else { $other_rules[$k] = $v; }
+        }
+        DLEUrl::$rules = array_merge($custom_rules, $other_rules);
+        DLEUrl::SaveRules(DLEUrl::$rules);
+    }
+}
+$db->query("UPDATE " . PREFIX . "_plugins SET upgradeurl='https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json' WHERE name='Forge Forum'");
+
+// MySQL/MariaDB uyumlu kolon garantisi (ADD COLUMN IF NOT EXISTS yalnizca MariaDB'de vardir)
+$__ff_columns = array(
+    array(PREFIX . "_forum_topics", "is_approved", "ADD COLUMN `is_approved` tinyint(1) NOT NULL DEFAULT '1' AFTER `is_deleted`"),
+    array(PREFIX . "_forum_topics", "access", "ADD COLUMN `access` varchar(255) NOT NULL DEFAULT '' AFTER `is_approved`"),
+    array(PREFIX . "_forum_topics", "is_solved", "ADD COLUMN `is_solved` tinyint(1) NOT NULL DEFAULT '0' AFTER `is_locked`"),
+    array(PREFIX . "_forum_topics", "best_post_id", "ADD COLUMN `best_post_id` int(11) NOT NULL DEFAULT '0' AFTER `is_solved`"),
+    array(USERPREFIX . "_users", "forum_points", "ADD COLUMN `forum_points` INT(11) DEFAULT '0'"),
+    array(USERPREFIX . "_users", "forum_rank_id", "ADD COLUMN `forum_rank_id` INT(11) DEFAULT '0'"),
+    array(USERPREFIX . "_users", "forum_post_count", "ADD COLUMN `forum_post_count` INT(11) DEFAULT '0'"),
+);
+foreach ($__ff_columns as $__ff_col) {
+    $__ff_has = $db->super_query("SHOW COLUMNS FROM `" . $__ff_col[0] . "` LIKE '" . $__ff_col[1] . "'");
+    if (!$__ff_has) {
+        $db->query("ALTER TABLE `" . $__ff_col[0] . "` " . $__ff_col[2]);
+    }
+}
+unset($__ff_columns, $__ff_col, $__ff_has);]]></phpupgrade>
+	<phpenable
+    ><![CDATA[if (class_exists('DLEUrl')) {
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
+    foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
+
+    DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
+    DLEUrl::AddRule('forum_new_topic', '/forum/new-topic/',          '/index.php?do=forum&action=new_topic');
+    DLEUrl::AddRule('forum_new_topic_cat', '/forum/new-topic/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=new_topic&cat={category}');
+    DLEUrl::AddRule('forum_reply',     '/forum/reply/',              '/index.php?do=forum&action=reply');
+    DLEUrl::AddRule('forum_reply_id',  '/forum/reply/{newsid}/',     '/index.php?do=forum&action=reply&topic_id={newsid}');
+    DLEUrl::AddRule('forum_search',    '/forum/search/',             '/index.php?do=forum&action=search');
+    DLEUrl::AddRule('forum_edit',      '/forum/edit/{newsid}/',      '/index.php?do=forum&action=edit&id={newsid}');
+    DLEUrl::AddRule('forum_profile',   '/forum/user/{user}/',        '/index.php?do=forum&action=profile&user={user}');
+    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
+    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name}/', '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
+    DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
+    DLEUrl::AddRule('forum_tag', '/forum/etiket/{tag}/', '/index.php?do=forum&action=tag&tag={tag}');
+    DLEUrl::AddRule('forum_rss', '/forum/rss/', '/index.php?do=forum&action=feed');
+    DLEUrl::AddRule('forum_rss_cat', '/forum/rss/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=feed&cat={category}');
     DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
 
     if (is_array(DLEUrl::$rules)) {
@@ -560,14 +740,28 @@ $db->query("UPDATE " . PREFIX . "_plugins SET upgradeurl='https://raw.githubuser
 }]]></phpenable>
 	<phpdisable
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
     foreach($rules as $r) DLEUrl::DeleteRule('custom.' . $r);
 }]]></phpdisable>
 	<phpdelete
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
     foreach($rules as $r) DLEUrl::DeleteRule('custom.' . $r);
-}]]></phpdelete>
+}
+
+// MySQL/MariaDB uyumlu kolon kaldirma (DROP COLUMN IF EXISTS yalnizca MariaDB'de vardir)
+$__ff_drop = array(
+    array(USERPREFIX . "_users", "forum_post_count"),
+    array(USERPREFIX . "_users", "forum_rank_id"),
+    array(USERPREFIX . "_users", "forum_points"),
+);
+foreach ($__ff_drop as $__ff_d) {
+    $__ff_has = $db->super_query("SHOW COLUMNS FROM `" . $__ff_d[0] . "` LIKE '" . $__ff_d[1] . "'");
+    if ($__ff_has) {
+        $db->query("ALTER TABLE `" . $__ff_d[0] . "` DROP COLUMN `" . $__ff_d[1] . "`");
+    }
+}
+unset($__ff_drop, $__ff_d, $__ff_has);]]></phpdelete>
 	<notice><![CDATA[]]></notice>
 	<file name="engine/engine.php">
 		<operation action="replace">
@@ -578,6 +772,13 @@ $db->query("UPDATE " . PREFIX . "_plugins SET upgradeurl='https://raw.githubuser
 case "forum" :
     include (DLEPlugins::Check(ENGINE_DIR . '/modules/forum.php'));
     break;]]></replacecode>
+			<enabled>1</enabled>
+		</operation>
+	</file>
+	<file name="engine/ajax/controller.php">
+		<operation action="replace">
+			<searchcode><![CDATA["newsletter_templates", "oembed" );]]></searchcode>
+			<replacecode><![CDATA["newsletter_templates", "oembed", "forum_approval", "forum_trash", "forum_tools" );]]></replacecode>
 			<enabled>1</enabled>
 		</operation>
 	</file>

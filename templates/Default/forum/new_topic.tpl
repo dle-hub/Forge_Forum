@@ -2,11 +2,21 @@
     <!-- Breadcrumb -->
     {forum_breadcrumb}
 
-    <!-- MyBB-style New Topic Form Container -->
-    <div class="mybb-category-block mt-4">
-        <div class="mybb-cat-header">
-            <span class="mybb-cat-title"><i class="fa fa-pencil-square-o mr-1.5"></i> Yeni Konu Aç</span>
-            <span class="mybb-cat-toggle"><i class="fa fa-minus"></i></span>
+    <!-- Araç çubuğu -->
+    <div class="forum-toolbar">
+        <div class="forum-toolbar__links">
+            <span class="forum-toolbar__title"><i class="fa fa-pencil-square-o"></i> {forum_ui_new_topic}</span>
+        </div>
+        <div class="forum-toolbar__end">
+            <a class="forum-toolbar__btn" href="{http_home_url}index.php?do=forum"><i class="fa fa-arrow-left"></i><span>{forum_ui_back_to_forum}</span></a>
+        </div>
+    </div>
+
+    <!-- Yeni konu formu -->
+    <div class="forum-category-block mt-4">
+        <div class="forum-cat-header">
+            <span class="forum-cat-title"><i class="fa fa-edit mr-1.5"></i> {forum_ui_topic_details}</span>
+            <span class="forum-cat-toggle"><i class="fa fa-minus"></i></span>
         </div>
         
         <div class="p-6">
@@ -16,7 +26,7 @@
                 <!-- Kategori -->
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
-                        <i class="fa fa-folder-open text-blue-500"></i> Kategori Seçin
+                        <i class="fa fa-folder-open text-blue-500"></i> {forum_new_cat_select}
                     </label>
                     <div class="w-full relative">
                         {category_selector}
@@ -26,76 +36,92 @@
                 <!-- Başlık -->
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
-                        <i class="fa fa-tag text-blue-500"></i> Konu Başlığı
+                        <i class="fa fa-tag text-blue-500"></i> {forum_new_title_label}
                     </label>
                     <div class="flex flex-col sm:flex-row gap-2">
                         {prefix_selector}
-                        <input type="text" name="title" required maxlength="255"
+                        <input type="text" name="title" id="forum-topic-title" required maxlength="255"
                                class="flex-1 border border-gray-300 rounded p-3 text-sm"
-                               placeholder="Konunuzu özetleyen açıklayıcı bir başlık yazın...">
+                               placeholder="{forum_new_title_ph}">
                     </div>
                 </div>
 
                 <!-- Mesaj -->
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
-                        <i class="fa fa-align-left text-blue-500"></i> Mesaj İçeriği
+                        <i class="fa fa-align-left text-blue-500"></i> {forum_new_text_label}
                     </label>
+                    <div id="forum-draft-notice" class="forum-draft-notice" style="display:none;">
+                        <i class="fa fa-floppy-o"></i> {forum_new_draft_loaded} (<span class="forum-draft-notice__time"></span>).
+                        <button type="button" class="forum-btn-mini" onclick="forumDiscardDraft('new_topic',0,'forum-editor')"><i class="fa fa-trash"></i> {forum_new_draft_discard}</button>
+                    </div>
                     {forum_editor}
                 </div>
 
                 <!-- Etiketler -->
                 <div>
                     <label class="block text-xs font-bold uppercase tracking-wider text-gray-500 mb-2 flex items-center gap-1.5">
-                        <i class="fa fa-tags text-blue-500"></i> Konu Etiketleri (Virgülle ayırın)
+                        <i class="fa fa-tags text-blue-500"></i> {forum_new_tags_label}
                     </label>
                     <input type="text" name="tags"
                            class="w-full border border-gray-300 rounded p-3 text-sm"
-                           placeholder="örneğin: dle, eklenti, forum">
+                           placeholder="{forum_new_tags_ph}">
                 </div>
 
                 <!-- Anket Ekle (Poll Creator) -->
                 <div class="border border-gray-200 rounded p-4 bg-gray-50 mt-4">
-                    <div class="font-bold text-sm mb-3 flex items-center gap-1.5 text-gray-700 cursor-pointer" onclick="document.getElementById('mybb-poll-fields').classList.toggle('hidden')">
-                        <i class="fa fa-bar-chart text-blue-500"></i> Konuya Anket Ekle (İsteğe Bağlı - Göstermek için tıklayın)
+                    <div class="font-bold text-sm mb-3 flex items-center gap-1.5 text-gray-700 cursor-pointer" onclick="document.getElementById('forum-poll-fields').classList.toggle('hidden')">
+                        <i class="fa fa-bar-chart text-blue-500"></i> {forum_new_poll_toggle}
                     </div>
-                    <div id="mybb-poll-fields" class="hidden space-y-4 pt-2">
+                    <div id="forum-poll-fields" class="hidden space-y-4 pt-2">
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Anket Sorusu</label>
-                            <input type="text" name="poll_question" class="w-full border border-gray-300 rounded p-2.5 text-sm bg-white" placeholder="Ankette neyi sormak istersiniz?">
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">{forum_new_poll_question}</label>
+                            <input type="text" name="poll_question" class="w-full border border-gray-300 rounded p-2.5 text-sm bg-white" placeholder="{forum_new_poll_question_ph}">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-gray-600 mb-1">Seçenekler (Her satıra bir tane yazın)</label>
-                            <textarea name="poll_options" rows="4" class="w-full border border-gray-300 rounded p-2.5 text-sm bg-white" placeholder="Seçenek 1&#10;Seçenek 2&#10;Seçenek 3"></textarea>
+                            <label class="block text-xs font-semibold text-gray-600 mb-1">{forum_new_poll_options}</label>
+                            <textarea name="poll_options" rows="4" class="w-full border border-gray-300 rounded p-2.5 text-sm bg-white" placeholder="{forum_new_poll_options_ph}"></textarea>
                         </div>
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Maksimum Seçilebilir Seçenek Sayısı</label>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">{forum_new_poll_max}</label>
                                 <input type="number" name="poll_max_choices" value="1" min="1" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
                             </div>
                             <div>
-                                <label class="block text-xs font-semibold text-gray-600 mb-1">Anket Süresi (Gün, 0 = Sınırsız)</label>
+                                <label class="block text-xs font-semibold text-gray-600 mb-1">{forum_new_poll_days}</label>
                                 <input type="number" name="poll_days" value="0" min="0" class="w-full border border-gray-300 rounded p-2 text-sm bg-white">
                             </div>
                         </div>
                         <div class="flex items-center gap-2 pt-2">
                             <input type="checkbox" name="poll_multiple" id="poll_multiple" value="1" class="rounded border-gray-300">
-                            <label for="poll_multiple" class="text-xs font-semibold text-gray-600 cursor-pointer">Birden fazla seçeneğe oy verilebilsin</label>
+                            <label for="poll_multiple" class="text-xs font-semibold text-gray-600 cursor-pointer">{forum_new_poll_multiple}</label>
                         </div>
                     </div>
                 </div>
 
+                {topic_captcha}
+
                 <!-- Gönder -->
                 <div class="flex items-center justify-between pt-4 border-t">
                     <span class="text-xs text-gray-400 flex items-center gap-1">
-                        <i class="fa fa-info-circle text-gray-300 text-sm"></i> Görsel düzenleyici ile yazın
+                        <i class="fa fa-info-circle text-gray-300 text-sm"></i> {forum_new_editor_hint}
                     </span>
                     <button type="submit" name="submit_topic"
-                            class="mybb-btn-action cursor-pointer">
-                        Yeni Konuyu Aç
+                            class="forum-btn-action cursor-pointer">
+                        {forum_new_submit}
                     </button>
                 </div>
             </form>
         </div>
     </div>
 </div>
+
+<script>
+(function () {
+    if (typeof forumDraftInit !== 'function') return;
+    if ('{drafts_enabled}' !== 'true') return;
+    if (!document.getElementById('forum-editor')) return;
+    var catSel = document.querySelector('select[name="cat_id"]');
+    forumDraftInit({ type: 'new_topic', topicId: 0, catId: catSel ? catSel.value : 0, titleFieldId: 'forum-topic-title', editorId: 'forum-editor' });
+})();
+</script>

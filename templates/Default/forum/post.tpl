@@ -1,32 +1,34 @@
-<div id="post-{post_id}" class="mybb-post-container mybb-post-gap">
+<div id="post-{post_id}" class="forum-post-container forum-post-gap">
     <!-- Top Bar: Subject & Post Number -->
-    <div class="mybb-post-header mybb-post-header-layout">
-        <div class="mybb-post-subject">
-            {p_name} — Mesajı
+    <div class="forum-post-header forum-post-header-layout">
+        <div class="forum-post-subject">
+            {p_name} — Mesajı [is-best-answer]<span class="badge badge--best"><i class="fa fa-check"></i> EN İYİ CEVAP</span>[/is-best-answer]
         </div>
-        <div class="mybb-post-num">
+        <div class="forum-post-num">
             Mesaj: #{p_num}
-            [group=1,2]<input type="checkbox" class="mybb-post-select" data-postid="{post_id}" title="Toplu işlem için seçin">[/group]
+            [p-edited]<span class="forum-post-edited" title="{p_edited}"><i class="fa fa-pencil"></i> {p_edited}</span>[/p-edited]
+            [can-history]<a href="{p_history_url}" class="forum-history-link" title="Düzenleme geçmişi"><i class="fa fa-history"></i></a>[/can-history]
+            [group=1,2]<input type="checkbox" class="forum-post-select" data-postid="{post_id}" title="Toplu işlem için seçin">[/group]
         </div>
     </div>
     
     <!-- Middle Area: Author info + Message Content -->
-    <div class="mybb-post-main">
+    <div class="forum-post-main">
         <!-- Left Sidebar: Author Info -->
-        <div class="mybb-post-author-sidebar">
+        <div class="forum-post-author-sidebar">
             <!-- Square Avatar Container -->
-            <div class="mybb-avatar-box">
+            <div class="forum-avatar-box">
                 {avatar}
             </div>
             
             <!-- Username with online indicator -->
-            <div class="mybb-author-name">
-                {p_name} <span class="mybb-online-dot" title="Çevrimiçi"></span>
+            <div class="forum-author-name">
+                {p_name} <span class="forum-online-dot" title="Çevrimiçi"></span>
             </div>
             
             <!-- Owner Badge -->
             [owner]
-            <div class="mybb-owner-badge">
+            <div class="forum-owner-badge">
                 Konu Sahibi
             </div>
             [/owner]
@@ -40,31 +42,31 @@
             [/p-has-rank]
 
             <!-- Yıldız Satırı -->
-            <div class="mybb-author-stars" data-stars="{p_star_count}" data-color="{p_star_color}"></div>
+            <div class="forum-author-stars" data-stars="{p_star_count}" data-color="{p_star_color}"></div>
 
             <!-- Author stats -->
-            <div class="mybb-author-stats">
-                <div class="mybb-author-stat-row">
+            <div class="forum-author-stats">
+                <div class="forum-author-stat-row">
                     <span>Mesaj:</span>
-                    <span class="mybb-author-stat-val">{p_posts}</span>
+                    <span class="forum-author-stat-val">{p_posts}</span>
                 </div>
-                <div class="mybb-author-stat-row">
+                <div class="forum-author-stat-row">
                     <span>Puan:</span>
-                    <span class="mybb-author-stat-val">{p_pts}</span>
+                    <span class="forum-author-stat-val">{p_pts}</span>
                 </div>
             </div>
         </div>
         
         <!-- Right Content Area -->
-        <div class="mybb-post-content-area">
+        <div class="forum-post-content-area">
             <!-- Message text -->
-            <div class="mybb-post-body forum-post-content">
+            <div class="forum-post-body forum-post-content">
                 {p_text}
             </div>
             
             <!-- IP Adresi — sadece admin/mod görür -->
             [group=1,2]
-            <div class="mybb-post-ip">
+            <div class="forum-post-ip">
                 <i class="fa fa-globe"></i> IP: {p_ip}
             </div>
             [/group]
@@ -72,47 +74,59 @@
     </div>
     
     <!-- Bottom Footer Bar: Date & Quick Actions -->
-    <div class="mybb-post-footer mybb-post-footer-layout">
-        <div class="mybb-post-date-area">
-            <span class="mybb-post-date-text"><i class="fa fa-clock-o"></i> {p_date}</span>
-            <div class="mybb-post-quick-links">
+    <div class="forum-post-footer forum-post-footer-layout">
+        <div class="forum-post-date-area">
+            <span class="forum-post-date-text"><i class="fa fa-clock-o"></i> {p_date}</span>
+            <div class="forum-post-quick-links">
                     [has-email]
-                    <a href="{p_email_href}" class="mybb-btn-mini mybb-quicklink-btn" title="E-Posta Gönder">
+                    <a href="{p_email_href}" class="forum-btn-mini forum-quicklink-btn" title="E-Posta Gönder">
                         <i class="fa fa-envelope-o"></i> E-POSTA
                     </a>
                     [/has-email]
                     [can-pm]
-                    <a href="{p_pm_href}" onclick="{p_pm_onclick}" class="mybb-btn-mini mybb-quicklink-btn" title="Özel Mesaj Gönder">
+                    <a href="{p_pm_href}" onclick="{p_pm_onclick}" class="forum-btn-mini forum-quicklink-btn" title="Özel Mesaj Gönder">
                         <i class="fa fa-comment-o"></i> ÖZEL MESAJ
                     </a>
                     [/can-pm]
                     [has-profile]
-                    <a href="{p_find_href}" class="mybb-btn-mini mybb-quicklink-btn" title="Bu üyenin forumda yazdıklarını bul">
+                    <a href="{p_find_href}" class="forum-btn-mini forum-quicklink-btn" title="Bu üyenin forumda yazdıklarını bul">
                         <i class="fa fa-search"></i> BUL
                     </a>
                     [/has-profile]
                 </div>
         </div>
-        <div class="mybb-post-actions">
-            <button onclick="forumLikePost({post_id},'like')" class="mybb-btn-mini mybb-like-btn">
+        <div class="forum-post-actions">
+            <button onclick="forumLikePost({post_id},'like')" class="forum-btn-mini forum-like-btn">
                 <i class="fa fa-thumbs-up"></i> Beğen (<span id="like-count-{post_id}">{likes}</span>)
             </button>
-            <button onclick="forumLikePost({post_id},'dislike')" class="mybb-btn-mini mybb-dislike-btn">
+            <button onclick="forumLikePost({post_id},'dislike')" class="forum-btn-mini forum-dislike-btn">
                 <i class="fa fa-thumbs-down"></i> (<span id="dislike-count-{post_id}">{dislikes}</span>)
             </button>
             [edit]
-            <a href="{http_home_url}index.php?do=forum&action=edit&post_id={post_id}" class="mybb-btn-mini mybb-edit-btn">
+            <a href="{http_home_url}index.php?do=forum&action=edit&post_id={post_id}" class="forum-btn-mini forum-edit-btn">
                 <i class="fa fa-edit"></i> DÜZENLE
             </a>
             [/edit]
             [complaint]
-            <button onclick="forumReportPost({post_id})" class="mybb-btn-mini mybb-report-btn">
+            <button onclick="forumReportPost({post_id})" class="forum-btn-mini forum-report-btn">
                 <i class="fa fa-exclamation-triangle"></i> Şikayet Et
             </button>
             [/complaint]
-            <button id="quote-btn-{post_id}" onclick="forumQuotePost({post_id})" class="mybb-btn-action">
-                ALINTILA
+            [can-quote]
+            <button type="button" id="mquote-btn-{post_id}" onclick="forumMultiquoteToggle({post_id})" class="forum-btn-mini forum-mquote-btn" title="Çoklu alıntıya ekle / çıkar">
+                <i class="fa fa-plus-square-o"></i> ALINTI+
             </button>
+            [/can-quote]
+            [can-best]
+            <button type="button" onclick="forumMarkBest({topic_id},{post_id})" class="forum-btn-mini forum-best-btn" title="En iyi cevap olarak işaretle">
+                <i class="fa fa-check-circle-o"></i> EN İYİ
+            </button>
+            [/can-best]
+            [can-quote]
+            <button id="quote-btn-{post_id}" onclick="forumQuotePost({post_id})" class="forum-btn-action">
+                <i class="fa fa-quote-left"></i> ALINTILA
+            </button>
+            [/can-quote]
         </div>
     </div>
 </div>

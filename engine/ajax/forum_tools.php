@@ -31,6 +31,13 @@ if ($member_id["user_group"] != 1) {
     exit();
 }
 
+// CSRF korumasi (durum degistiren istekler)
+if (empty($_POST["user_hash"]) || $_POST["user_hash"] !== $dle_login_hash) {
+    header("Content-Type: application/json");
+    echo json_encode(["success" => false, "error" => $lang['forum_ajax_csrf']]);
+    exit();
+}
+
 $forum_cfg = [];
 $db->query("SELECT name, value FROM " . PREFIX . "_forum_settings");
 while ($row = $db->get_row()) {

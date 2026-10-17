@@ -28,6 +28,13 @@ if( $member_id['user_group'] > 2 ) {
     exit;
 }
 
+// CSRF korumasi (durum degistiren istekler)
+if( empty($_POST['user_hash']) || $_POST['user_hash'] !== $dle_login_hash ) {
+    header('Content-Type: application/json');
+    echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_csrf']]);
+    exit;
+}
+
 header('Content-Type: application/json');
 $action = isset($_POST['action']) ? totranslit($_POST['action']) : '';
 $id     = isset($_POST['id']) ? intval($_POST['id']) : 0;
@@ -41,6 +48,41 @@ function approvalLog($act,$target,$tid) {
         VALUES ('{$mod_id}','{$act}','{$target}','{$tid}',NOW(),'".$db->safesql($_IP)."')");
 }
 
+function approval_approve_topic($id) {
+    global $db;
+    $id = intval($id);
+    $topic = $db->super_query("SELECT * FROM ".PREFIX."_forum_topics WHERE id='{$id}'");
+    if(!$topic['id']) return false;
+
+    $db->query("UPDATE ".PREFIX."_forum_topics SET is_approved=1 WHERE id='{$id}'");
+    $db->query("UPDATE ".PREFIX."_forum_posts SET is_approved=1 WHERE topic_id='{$id}' AND is_approved=0");
+
+    $cid = intval($topic['cat_id']);
+    $postCnt = $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_posts p JOIN ".PREFIX."_forum_topics t ON t.id=p.topic_id WHERE t.cat_id='{$cid}' AND p.is_deleted=0 AND t.is_deleted=0");
+    $topicCnt= $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_topics WHERE cat_id='{$cid}' AND is_deleted=0 AND is_approved=1");
+    $db->query("UPDATE ".PREFIX."_forum_cats SET topic_count='".intval($topicCnt['cnt'])."', post_count='".intval($postCnt['cnt'])."' WHERE id='{$cid}'");
+
+    $uid = intval($topic['user_id']);
+    $pc = $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_posts WHERE user_id='{$uid}' AND is_deleted=0 AND is_approved=1");
+    $db->query("UPDATE ".PREFIX."_users SET forum_post_count='".intval($pc['cnt'])."' WHERE user_id='{$uid}'");
+
+    approvalLog('approve_topic','topic',$id);
+    return true;
+}
+
+function approval_reject_topic($id) {
+    global $db;
+    $tid = intval($id);
+    $db->query("DELETE FROM ".PREFIX."_forum_likes WHERE post_id IN (SELECT id FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}')");
+    $db->query("DELETE FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}'");
+    $db->query("DELETE FROM ".PREFIX."_forum_polls WHERE topic_id='{$tid}'");
+    $db->query("DELETE FROM ".PREFIX."_forum_topic_tags WHERE topic_id='{$tid}'");
+    $db->query("DELETE FROM ".PREFIX."_forum_subs WHERE topic_id='{$tid}'");
+    $db->query("DELETE FROM ".PREFIX."_forum_topics WHERE id='{$tid}'");
+    approvalLog('reject_topic','topic',$tid);
+    return true;
+}
+
 switch($action) {
 
     // =========================================
@@ -50,26 +92,7 @@ switch($action) {
         if(!$id){ echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_invalid_id']]); exit; }
 
         if($type == 'topic') {
-            $topic = $db->super_query("SELECT * FROM ".PREFIX."_forum_topics WHERE id='{$id}'");
-            if(!$topic['id']){ echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_topic_not_found']]); exit; }
-
-            $db->query("UPDATE ".PREFIX."_forum_topics SET is_approved=1 WHERE id='{$id}'");
-            // Konuya ait onaysız mesajları da onayla
-            $db->query("UPDATE ".PREFIX."_forum_posts SET is_approved=1 WHERE topic_id='{$id}' AND is_approved=0");
-
-            // Kategori sayacını güncelle
-            $cid = intval($topic['cat_id']);
-            $postCnt = $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_posts p JOIN ".PREFIX."_forum_topics t ON t.id=p.topic_id WHERE t.cat_id='{$cid}' AND p.is_deleted=0 AND t.is_deleted=0");
-            $topicCnt= $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_topics WHERE cat_id='{$cid}' AND is_deleted=0 AND is_approved=1");
-            $db->query("UPDATE ".PREFIX."_forum_cats SET topic_count='".intval($topicCnt['cnt'])."', post_count='".intval($postCnt['cnt'])."' WHERE id='{$cid}'");
-
-            // Kullanıcı sayaçlarını güncelle
-            $uid = intval($topic['user_id']);
-            $tc = $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_topics WHERE user_id='{$uid}' AND is_deleted=0 AND is_approved=1");
-            $pc = $db->super_query("SELECT COUNT(*) AS cnt FROM ".PREFIX."_forum_posts WHERE user_id='{$uid}' AND is_deleted=0 AND is_approved=1");
-            $db->query("UPDATE ".PREFIX."_users SET forum_post_count='".intval($pc['cnt'])."' WHERE user_id='{$uid}'");
-
-            approvalLog('approve_topic','topic',$id);
+            if(!approval_approve_topic($id)) { echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_topic_not_found']]); exit; }
         } else {
             $post = $db->super_query("SELECT * FROM ".PREFIX."_forum_posts WHERE id='{$id}'");
             if(!$post['id']){ echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_post_not_found']]); exit; }
@@ -106,8 +129,9 @@ switch($action) {
 
         if($type == 'topic') {
             $tid = $id;
-            $db->query("DELETE FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}'");
+            // Beğenileri önce sil (mesajlar silinince alt sorgu boş döner)
             $db->query("DELETE FROM ".PREFIX."_forum_likes WHERE post_id IN (SELECT id FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}')");
+            $db->query("DELETE FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}'");
             $db->query("DELETE FROM ".PREFIX."_forum_polls WHERE topic_id='{$tid}'");
             $db->query("DELETE FROM ".PREFIX."_forum_topic_tags WHERE topic_id='{$tid}'");
             $db->query("DELETE FROM ".PREFIX."_forum_subs WHERE topic_id='{$tid}'");
@@ -129,7 +153,8 @@ switch($action) {
         if(!$id){ echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_invalid_id']]); exit; }
 
         if($type == 'topic') {
-            $item = $db->super_query("SELECT t.ip AS tip, t.user_id FROM ".PREFIX."_forum_topics t WHERE t.id='{$id}'");
+            // Konunun kendi 'ip' kolonu yoktur; yazarin IP'sini konunun ilk mesajindan al.
+            $item = $db->super_query("SELECT p.ip AS tip, p.user_id FROM ".PREFIX."_forum_posts p WHERE p.topic_id='{$id}' ORDER BY p.id ASC LIMIT 1");
         } else {
             $item = $db->super_query("SELECT p.ip AS tip, p.user_id FROM ".PREFIX."_forum_posts p WHERE p.id='{$id}'");
         }
@@ -137,9 +162,10 @@ switch($action) {
         $banIP = $item['tip'];
         $banUID= intval($item['user_id']);
 
-        // IP'yi DLE ban listesine ekle
+        // IP'yi DLE ban listesine ekle (kalici IP ban: users_id=0, days=0, date=0)
         if($banIP) {
-            $db->query("INSERT IGNORE INTO ".PREFIX."_banned (ip, users_id, date, reason) VALUES ('".$db->safesql($banIP)."','{$banUID}',NOW(),'Forum: Onaylanmamış spam içerik')");
+            $db->query("INSERT IGNORE INTO " . USERPREFIX . "_banned (descr, date, days, ip, users_id, banned_from) VALUES ('Forum: Onaylanmamis spam icerik', '0', '0', '" . $db->safesql($banIP) . "', '0', 'forum')");
+            @unlink(ENGINE_DIR . '/cache/system/banned.json');
         }
 
         // İçeriği sil
@@ -155,8 +181,32 @@ switch($action) {
         echo json_encode(['success'=>true,'message'=>sprintf($lang['forum_ajax_approval_banned'], $banIP)]);
         break;
 
+    // =========================================
+    // TOPLU ONAYLA
+    // =========================================
+    case 'bulk_approve':
+    case 'bulk_reject':
+        $ids = isset($_POST['ids']) ? $_POST['ids'] : '';
+        if (is_array($ids)) { $list = array_map('intval', $ids); }
+        else { $list = array_map('intval', explode(',', (string) $ids)); }
+        $list = array_values(array_unique(array_filter($list, function($v){ return $v > 0; })));
+        if (empty($list)) { echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_invalid_id']]); exit; }
+
+        $done = 0;
+        foreach ($list as $tid) {
+            if ($action === 'bulk_approve') {
+                if (approval_approve_topic($tid)) { $done++; }
+            } else {
+                if (approval_reject_topic($tid)) { $done++; }
+            }
+        }
+        $tmpl = $action === 'bulk_approve'
+            ? ($lang['forum_ajax_bulk_approved'] ?? '%d konu onaylandı.')
+            : ($lang['forum_ajax_bulk_rejected'] ?? '%d konu silindi.');
+        echo json_encode(['success'=>true,'count'=>$done,'message'=>sprintf($tmpl, $done)]);
+        break;
+
     default:
         echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_unknown_action']]);
-}
 }
 exit;

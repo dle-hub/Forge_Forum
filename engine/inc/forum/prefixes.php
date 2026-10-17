@@ -26,7 +26,7 @@ $subaction = isset($_REQUEST["subaction"])
 // POST: SİL
 // -------------------------------------------------
 if ($subaction == "delete" && $prefix_id > 0) {
-    if ($_REQUEST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_REQUEST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -41,7 +41,7 @@ if ($subaction == "delete" && $prefix_id > 0) {
 // POST: KAYDET / GÜNCELLE
 // -------------------------------------------------
 if (isset($_POST["save_prefix"])) {
-    if ($_POST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_POST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -161,7 +161,7 @@ while ($row = $db->get_row()) {
   <div class="modal-dialog modal-lg" role="document">
     <div class="modal-content">
       <form method="post" action="?mod=forum&action=prefixes" autocomplete="off">
-        <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+        <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
         <div class="modal-header ui-dialog-titlebar">
           <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
           <span class="ui-dialog-title" id="newPrefixLabel"><?php echo $lang['forum_prefix_new']; ?></span>
@@ -253,7 +253,7 @@ while ($row = $db->get_row()) {
   </div>
   <div class="panel-body">
     <form method="post" action="?mod=forum&action=prefixes&prefix_id=<?php echo $prefix_id; ?>" class="form-horizontal" autocomplete="off">
-      <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+      <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
       <div class="form-group">
         <label class="control-label col-md-2 col-sm-3"><?php echo $lang['forum_prefix_name']; ?> <span class="text-danger">*</span></label>
         <div class="col-md-10 col-sm-9">
@@ -397,7 +397,7 @@ while ($row = $db->get_row()) {
                     "href" =>
                         "?mod=forum&action=prefixes&prefix_id=" .
                         intval($p["id"]) .
-                        "&subaction=delete&dle_post_hash=" .
+                        "&subaction=delete&user_hash=" .
                         $dle_login_hash,
                     "label" => $lang["forum_btn_delete"],
                     "icon" => "fa fa-trash-o",

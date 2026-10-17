@@ -3,29 +3,26 @@
     <!-- Breadcrumb (forum.php tarafından otomatik doldurulur) -->
     {forum_breadcrumb}
 
-    <!-- Actions Strip -->
-    <div class="mybb-actions-strip">
-        <div class="mybb-notif-page-title">
-            <i class="fa fa-bell notif-bell-icon"></i>
-            Bildirimleriniz
-            [has-forum-notifs]
-            <span class="notif-count-badge">{forum_notif_count}</span>
-            [/has-forum-notifs]
+    <!-- Araç çubuğu -->
+    <div class="forum-toolbar">
+        <div class="forum-toolbar__links">
+            <span class="forum-toolbar__title"><i class="fa fa-bell"></i> {forum_ui_notifications_title}</span>
+            [has-forum-notifs]<span class="forum-toolbar__count notif-count-badge">{forum_notif_count}</span>[/has-forum-notifs]
         </div>
-        <div>
-            <button onclick="markAllNotifsRead()" class="mybb-btn-mini notif-mark-all-btn">
-                <i class="fa fa-check-square-o"></i> Hepsini Okundu İşaretle
+        <div class="forum-toolbar__end">
+            <button type="button" onclick="markAllNotifsRead()" class="forum-toolbar__btn">
+                <i class="fa fa-check-square-o"></i><span>{forum_ui_mark_all_notifs_read}</span>
             </button>
         </div>
     </div>
 
     <!-- Bildirim Listesi -->
-    <div class="mybb-category-block">
-        <div class="mybb-cat-header">
-            <span class="mybb-cat-title"><i class="fa fa-bell-o" style="margin-right:6px; opacity:.8;"></i> Son Bildirimler</span>
+    <div class="forum-category-block">
+        <div class="forum-cat-header">
+            <span class="forum-cat-title"><i class="fa fa-bell-o" style="margin-right:6px; opacity:.8;"></i> {forum_ui_notifications_recent}</span>
         </div>
 
-        <div class="mybb-cat-rows" id="notif-rows-container">
+        <div class="forum-cat-rows" id="notif-rows-container">
             {notification_rows}
         </div>
     </div>
@@ -52,8 +49,8 @@ function deleteNotif(id) {
                 setTimeout(function() {
                     row.remove();
                     var container = document.getElementById('notif-rows-container');
-                    if (container && container.querySelectorAll('.mybb-row').length === 0) {
-                        container.innerHTML = '<div class="notif-empty-state"><i class="fa fa-bell-slash-o"></i><br>Henüz bildiriminiz yok.</div>';
+                    if (container && container.querySelectorAll('.forum-row').length === 0) {
+                        container.innerHTML = '<div class="notif-empty-state"><i class="fa fa-bell-slash-o"></i><br>{forum_ui_no_notifications}</div>';
                     }
                 }, 380);
             }
@@ -67,7 +64,7 @@ function markAllNotifsRead() {
             if (data.success) {
                 /* Okunmamış satırları okunmuş görünüme çevir */
                 document.querySelectorAll('.notif-unread-row').forEach(function(el) {
-                    el.classList.remove('mybb-row-unread', 'notif-unread-row');
+                    el.classList.remove('forum-row-unread', 'notif-unread-row');
                     el.classList.add('notif-read-row');
                     var dot = el.querySelector('.forum-unread-dot');
                     if (dot) {

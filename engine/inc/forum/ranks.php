@@ -35,7 +35,7 @@ $subaction = isset( $_REQUEST['subaction'] ) ? totranslit( $_REQUEST['subaction'
 // --- KAYDET / GÜNCELLE ---
 if ( isset( $_POST['save_rank'] ) ) {
 
-    if ( $_POST['dle_post_hash'] !== $dle_login_hash ) {
+    if ( $_POST['user_hash'] !== $dle_login_hash ) {
         msg( "error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc'] );
         return;
     }
@@ -82,7 +82,7 @@ if ( isset( $_POST['save_rank'] ) ) {
 // --- SİL ---
 if ( $subaction == 'delete' && $rank_id > 0 ) {
 
-    if ( $_REQUEST['dle_post_hash'] !== $dle_login_hash ) {
+    if ( $_REQUEST['user_hash'] !== $dle_login_hash ) {
         msg( "error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc'] );
         return;
     }
@@ -96,7 +96,7 @@ if ( $subaction == 'delete' && $rank_id > 0 ) {
 
 // --- ÜYEYE MANUEL RÜTBE ATA ---
 if ( isset( $_POST['assign_user_rank'] ) ) {
-    if ( $_POST['dle_post_hash'] !== $dle_login_hash ) {
+    if ( $_POST['user_hash'] !== $dle_login_hash ) {
         msg( "error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc'] );
         return;
     }
@@ -151,7 +151,7 @@ while ( $row = $db->get_row() ) {
         <?php echo $rank_id > 0 ? $lang['forum_rank_btn_edit'] : $lang['forum_rank_btn_add']; ?>
     </button>
     <?php if ( $rank_id > 0 ): ?>
-    <a href="?mod=forum&action=ranks" class="btn btn-default btn-xs"><i class="fa fa-times"></i> <?php echo $lang['forum_btn_cancel']; ?></a>
+    <a href="?mod=forum&action=ranks" class="btn bg-grey-400 btn-xs"><i class="fa fa-times"></i> <?php echo $lang['forum_btn_cancel']; ?></a>
     <?php endif; ?>
 </div>
 
@@ -163,7 +163,7 @@ while ( $row = $db->get_row() ) {
         </div>
         <div class="panel-body">
             <form method="post" action="?mod=forum&action=ranks<?php echo $rank_id > 0 ? '&rank_id=' . $rank_id : ''; ?>">
-                <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+                <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
 
                 <table class="form">
                     <tr>
@@ -293,7 +293,7 @@ while ( $row = $db->get_row() ) {
                                 "href" =>
                                     "?mod=forum&action=ranks&rank_id=" .
                                     intval($r["id"]) .
-                                    "&subaction=delete&dle_post_hash=" .
+                                    "&subaction=delete&user_hash=" .
                                     $dle_login_hash,
                                 "label" => $lang["forum_btn_delete"],
                                 "icon" => "fa fa-trash-o",
@@ -324,7 +324,7 @@ while ( $row = $db->get_row() ) {
     <div class="panel-heading"><i class="fa fa-user-plus position-left"></i> <?php echo $lang['forum_rank_assign_title']; ?></div>
     <div class="panel-body">
         <form method="post" action="?mod=forum&action=ranks" class="form-horizontal">
-            <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+            <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
             <div class="form-group">
                 <label class="control-label col-md-2 col-sm-3"><?php echo $lang['forum_rank_assign_user']; ?></label>
                 <div class="col-md-10 col-sm-9">

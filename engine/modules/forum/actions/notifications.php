@@ -81,25 +81,15 @@ foreach ($notif_rows as $n) {
     $tpl2->set("{notif_url}", $notif_url);
 
     // Tip blokları
-    if ($n['type'] === 'reply') {
-        $tpl2->set("[type-reply]", "");
-        $tpl2->set("[/type-reply]", "");
-        $tpl2->set_block("'\\[type-like\\](.*?)\\[/type-like\\]'si", "");
-        $tpl2->set_block("'\\[type-mention\\](.*?)\\[/type-mention\\]'si", "");
-    } elseif ($n['type'] === 'like') {
-        $tpl2->set_block("'\\[type-reply\\](.*?)\\[/type-reply\\]'si", "");
-        $tpl2->set("[type-like]", "");
-        $tpl2->set("[/type-like]", "");
-        $tpl2->set_block("'\\[type-mention\\](.*?)\\[/type-mention\\]'si", "");
-    } elseif ($n['type'] === 'mention') {
-        $tpl2->set_block("'\\[type-reply\\](.*?)\\[/type-reply\\]'si", "");
-        $tpl2->set_block("'\\[type-like\\](.*?)\\[/type-like\\]'si", "");
-        $tpl2->set("[type-mention]", "");
-        $tpl2->set("[/type-mention]", "");
-    } else {
-        $tpl2->set_block("'\\[type-reply\\](.*?)\\[/type-reply\\]'si", "");
-        $tpl2->set_block("'\\[type-like\\](.*?)\\[/type-like\\]'si", "");
-        $tpl2->set_block("'\\[type-mention\\](.*?)\\[/type-mention\\]'si", "");
+    $notif_type   = (string) $n['type'];
+    $known_types  = ['reply', 'like', 'mention', 'follow_topic', 'cat_topic'];
+    foreach ($known_types as $kt) {
+        if ($kt === $notif_type) {
+            $tpl2->set("[type-{$kt}]", "");
+            $tpl2->set("[/type-{$kt}]", "");
+        } else {
+            $tpl2->set_block("'\\[type-" . $kt . "\\](.*?)\\[/type-" . $kt . "\\]'si", "");
+        }
     }
 
     // Okunmuş/Okunmamış durumu (yüklenirkenki durum)
@@ -119,6 +109,7 @@ foreach ($notif_rows as $n) {
 }
 
 $tpl->load_template("forum/notifications.tpl");
+forum_set_ui_lang($tpl, $lang);
 $tpl->set("{forum_breadcrumb}", "{forum_breadcrumb}");
 $tpl->set("{notification_rows}", $rows_html ?: '<div class="p-8 text-center text-gray-400 text-sm">' . $lang['forum_notif_empty'] . '</div>');
 $tpl->set("{http_home_url}", $config["http_home_url"]);

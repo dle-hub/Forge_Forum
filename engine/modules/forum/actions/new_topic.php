@@ -57,14 +57,14 @@ while ($row = $db->get_row()) {
 // 3. POST İŞLEMİ
 // -------------------------------------------------
 if (isset($_POST["submit_topic"])) {
-    if ($_POST["user_hash"] !== $dle_login_hash) {
+    if (!isset($_POST["user_hash"]) || $_POST["user_hash"] !== $dle_login_hash) {
         msgbox($lang['forum_err_title'], $lang['forum_edit_csrf']);
         return;
     }
 
-    $post_cat_id = intval($_POST["cat_id"]);
-    $post_title = trim($_POST["title"]);
-    $post_text = trim($_POST["text"]);
+    $post_cat_id = intval($_POST["cat_id"] ?? 0);
+    $post_title = trim($_POST["title"] ?? '');
+    $post_text = trim($_POST["text"] ?? '');
 
     if (!$post_cat_id) {
         msgbox($lang['forum_err_title'], $lang['forum_edit_invalid_cat']);
@@ -77,6 +77,14 @@ if (isset($_POST["submit_topic"])) {
     if (empty($post_text)) {
         msgbox($lang['forum_err_title'], $lang['forum_edit_empty_text']);
         return;
+    }
+
+    // CAPTCHA / Anti-Spam kontrolü
+    if (function_exists("forum_captcha_active") && forum_captcha_active("topic")) {
+        if (!forum_captcha_check()) {
+            msgbox($lang['forum_err_title'], $lang['forum_captcha_fail'] ?? $lang['recaptcha_fail']);
+            return;
+        }
     }
 
     // Flood kontrolü
@@ -141,7 +149,7 @@ if (isset($_POST["submit_topic"])) {
         // BBCode modu - BBCode etiketlerini temizle
         $post_text = strip_tags($post_text);
     }
-    $prefix_id  = intval($_POST['prefix_id']);
+    $prefix_id  = intval($_POST['prefix_id'] ?? 0);
     $safe_title = $db->safesql($post_title);
     $safe_text = $db->safesql($post_text);
     $alt_name = $db->safesql(totranslit($post_title));
@@ -176,14 +184,57 @@ if (isset($_POST["submit_topic"])) {
 
     $new_post_id = $db->insert_id();
 
+    // Otomatik abonelik (konu açan kullanıcı)
+    if (!empty($forum_cfg["enable_subscriptions"]) && intval($uid) > 0) {
+        $db->query("INSERT IGNORE INTO " . PREFIX . "_forum_subs (topic_id, user_id, date) VALUES ('{$new_topic_id}', '" . intval($uid) . "', '{$now}')");
+    }
+
     // Link uploads made during topic creation to the newly created post
     forum_link_pending_uploads($new_post_id, $uid);
 
     // Mention etiketlerini işle ve bildirim gönder
     forum_parse_mentions($post_text, $new_topic_id, $new_post_id, $uid);
 
+    // Takipçilere bildirim (yazarı takip edenlere yeni konu bildirimi)
+    if ($approved && !empty($forum_cfg["enable_notifications"])) {
+        $followers = [];
+        $uid_i = intval($uid);
+        $db->query(
+            "SELECT user_id FROM " . PREFIX . "_forum_follows WHERE target_id='{$uid_i}'",
+        );
+        while ($fw = $db->get_row()) {
+            $fid = intval($fw["user_id"]);
+            if ($fid > 0 && $fid !== $uid_i) {
+                $followers[] = $fid;
+            }
+        }
+        foreach ($followers as $fid) {
+            $db->query(
+                "INSERT INTO " .
+                    PREFIX .
+                    "_forum_notifs (user_id, from_user, type, topic_id, post_id, is_read, date)
+                VALUES ('{$fid}','{$uid_i}','follow_topic','{$new_topic_id}','{$new_post_id}',0,NOW())",
+            );
+        }
+    }
+
+    // Kategori abonelerine bildirim (yeni konu)
+    if ($approved && !empty($forum_cfg["enable_cat_subscribe"]) && function_exists("forum_notify_category_new_topic")) {
+        forum_notify_category_new_topic(
+            [
+                "id" => $new_topic_id,
+                "title" => $post_title,
+                "alt_name" => totranslit($post_title),
+                "cat_id" => intval($post_cat_id),
+            ],
+            $new_post_id,
+            $uid,
+            $post_text,
+        );
+    }
+
     // 2.1 EKLENTİ: Konu Etiketlerini Kaydet
-    $tags_str = trim($_POST['tags']);
+    $tags_str = trim($_POST['tags'] ?? '');
     if (!empty($tags_str)) {
         $tags_arr = explode(',', $tags_str);
         foreach ($tags_arr as $tname) {
@@ -211,12 +262,12 @@ if (isset($_POST["submit_topic"])) {
     }
 
     // 2.2 EKLENTİ: Konu Anketini Kaydet
-    $poll_question = trim($_POST['poll_question']);
-    $poll_options_str = trim($_POST['poll_options']);
+    $poll_question = trim($_POST['poll_question'] ?? '');
+    $poll_options_str = trim($_POST['poll_options'] ?? '');
     if (!empty($poll_question) && !empty($poll_options_str)) {
         $poll_multiple = isset($_POST['poll_multiple']) ? 1 : 0;
-        $poll_max_choices = intval($_POST['poll_max_choices']);
-        $poll_days = intval($_POST['poll_days']);
+        $poll_max_choices = intval($_POST['poll_max_choices'] ?? 0);
+        $poll_days = intval($_POST['poll_days'] ?? 0);
         $end_date = "NULL";
         if ($poll_days > 0) {
             $end_date = "'" . date('Y-m-d H:i:s', time() + $poll_days * 86400) . "'";
@@ -315,6 +366,9 @@ if (isset($_POST["submit_topic"])) {
     );
 
     // Başarılı → yönlendir
+    $db->query(
+        "DELETE FROM " . PREFIX . "_forum_drafts WHERE user_id='" . intval($uid) . "' AND type='new_topic' AND topic_id='0'",
+    );
     $redirect_url =
         $config["http_home_url"] .
         "forum/topic/" .
@@ -351,10 +405,12 @@ if ($forum_cfg["editor_enabled"]) {
 }
 
 $tpl->load_template("forum/new_topic.tpl");
+forum_set_ui_lang($tpl, $lang);
 $tpl->set("{cat_id}", $cat_id);
 $tpl->set("{cat_name}", htmlspecialchars($cat_name, ENT_QUOTES, "UTF-8"));
 $tpl->set("{http_home_url}", $config["http_home_url"]);
 $tpl->set("{dle_login_hash}", $dle_login_hash);
+$tpl->set("{drafts_enabled}", !empty($forum_cfg["enable_drafts"]) ? "true" : "false");
 $tpl->set("{lang_code}", $lang["language_code"]);
 $tpl->set("{lang_dir}", $lang["direction"]);
 
@@ -382,7 +438,7 @@ if (isset($cat_tree[0])) {
 }
 $tpl->set(
     "{category_selector}",
-    '<select name="cat_id" class="mybb-select" required>' .
+    '<select name="cat_id" class="forum-select" required>' .
         $cat_opts .
         "</select>",
 );
@@ -395,9 +451,16 @@ while ($prow = $db->get_row()) {
 }
 $tpl->set(
     "{prefix_selector}",
-    '<select name="prefix_id" class="mybb-select" style="max-width: 150px; margin-right: 10px;">' .
+    '<select name="prefix_id" class="forum-select" style="max-width: 150px; margin-right: 10px;">' .
         $prefix_opts .
         "</select>",
+);
+
+$tpl->set(
+    "{topic_captcha}",
+    function_exists("forum_captcha_active") && forum_captcha_active("topic")
+        ? forum_captcha_html()
+        : "",
 );
 
 $tpl->compile("content");

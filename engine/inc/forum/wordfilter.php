@@ -20,7 +20,7 @@ $subaction = isset( $_REQUEST['subaction'] ) ? totranslit( $_REQUEST['subaction'
 // --- KAYDET / GÜNCELLE ---
 if ( isset( $_POST['save_word'] ) ) {
 
-    if ( $_POST['dle_post_hash'] !== $dle_login_hash ) {
+    if ( $_POST['user_hash'] !== $dle_login_hash ) {
         msg( "error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc'] );
         return;
     }
@@ -54,7 +54,7 @@ if ( isset( $_POST['save_word'] ) ) {
 // --- SİL ---
 if ( $subaction == 'delete' && $word_id > 0 ) {
 
-    if ( $_REQUEST['dle_post_hash'] !== $dle_login_hash ) {
+    if ( $_REQUEST['user_hash'] !== $dle_login_hash ) {
         msg( "error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc'] );
         return;
     }
@@ -67,7 +67,7 @@ if ( $subaction == 'delete' && $word_id > 0 ) {
 // --- TOPLU İÇE AKTAR ---
 if ( isset( $_POST['bulk_import'] ) ) {
 
-    if ( $_POST['dle_post_hash'] !== $dle_login_hash ) {
+    if ( $_POST['user_hash'] !== $dle_login_hash ) {
         msg( "error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc'] );
         return;
     }
@@ -133,7 +133,7 @@ while ( $row = $db->get_row() ) {
         </div>
         <div class="panel-body">
             <form method="post" action="?mod=forum&action=wordfilter<?php echo $word_id > 0 ? '&word_id=' . $word_id : ''; ?>">
-                <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+                <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
 
                 <table class="form">
                     <tr>
@@ -195,7 +195,7 @@ while ( $row = $db->get_row() ) {
                                 <div class="btn-group btn-group-xs">
                                     <a href="?mod=forum&action=wordfilter&word_id=<?php echo $w['id']; ?>#word-form-panel"
                                        class="btn btn-primary" title="<?php echo $lang['forum_btn_edit']; ?>"><i class="fa fa-pencil"></i></a>
-                                    <a href="?mod=forum&action=wordfilter&word_id=<?php echo $w['id']; ?>&subaction=delete&dle_post_hash=<?php echo $dle_login_hash; ?>"
+                                    <a href="?mod=forum&action=wordfilter&word_id=<?php echo $w['id']; ?>&subaction=delete&user_hash=<?php echo $dle_login_hash; ?>"
                                        class="btn btn-danger" title="<?php echo $lang['forum_btn_delete']; ?>"
                                        onclick="return confirm('<?php echo $lang['forum_promo_del_conf']; ?>');"><i class="fa fa-trash"></i></a>
                                 </div>
@@ -223,7 +223,7 @@ while ( $row = $db->get_row() ) {
             </div>
             <div class="panel-body">
                 <form method="post" action="?mod=forum&action=wordfilter">
-                    <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+                    <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
                     <p class="text-muted small">
                         <?php echo $lang['forum_filter_bulk_desc']; ?>
                     </p>

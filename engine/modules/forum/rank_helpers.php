@@ -30,6 +30,12 @@ if (!function_exists("forum_ensure_rank_schema")) {
         }
         $done = true;
 
+        // Şema kontrolü yalnızca bir kez çalışır (kilit dosyası ile atlanır)
+        $rank_schema_lock = ENGINE_DIR . '/cache/system/forum_rank_schema_v1.lock';
+        if (file_exists($rank_schema_lock)) {
+            return;
+        }
+
         $db->query(
             "SHOW COLUMNS FROM " . PREFIX . "_forum_ranks LIKE 'image'",
         );
@@ -53,6 +59,8 @@ if (!function_exists("forum_ensure_rank_schema")) {
                 "ALTER TABLE `{$users_table}` ADD COLUMN `forum_manual_rank_id` INT(11) NOT NULL DEFAULT '0' AFTER `{$after}`",
             );
         }
+
+        @file_put_contents($rank_schema_lock, (string) time());
     }
 }
 
@@ -77,16 +85,27 @@ if (!function_exists("forum_rank_by_points")) {
             return null;
         }
 
+        // Rütbe tablosu istek boyunca önbelleğe alınır (N+1 sorgusunu önler)
+        static $ranks = null;
+        if ($ranks === null) {
+            $ranks = [];
+            $db->query(
+                "SELECT * FROM " .
+                    PREFIX .
+                    "_forum_ranks ORDER BY points ASC, id ASC",
+            );
+            while ($row = $db->get_row()) {
+                $ranks[] = $row;
+            }
+        }
+
         $points = intval($points);
         $rank = null;
-        $db->query(
-            "SELECT * FROM " .
-                PREFIX .
-                "_forum_ranks ORDER BY points ASC, id ASC",
-        );
-        while ($row = $db->get_row()) {
+        foreach ($ranks as $row) {
             if ($points >= intval($row["points"])) {
                 $rank = $row;
+            } else {
+                break;
             }
         }
 
@@ -104,13 +123,18 @@ if (!function_exists("forum_rank_by_id")) {
             return null;
         }
 
+        static $cache = [];
+        if (array_key_exists($rank_id, $cache)) {
+            return $cache[$rank_id];
+        }
+
         $rank = $db->super_query(
             "SELECT * FROM " .
                 PREFIX .
                 "_forum_ranks WHERE id='{$rank_id}'",
         );
 
-        return !empty($rank["id"]) ? $rank : null;
+        return $cache[$rank_id] = !empty($rank["id"]) ? $rank : null;
     }
 }
 
@@ -195,28 +219,28 @@ if (!function_exists("forum_rank_render_badge_html")) {
         if ($img_url !== "") {
             $img_src = htmlspecialchars($img_url, ENT_QUOTES, "UTF-8");
             if ($context === "profile") {
-                return '<span class="mybb-forum-rank mybb-forum-rank--image mybb-forum-rank--profile" title="' .
+                return '<span class="forum-rank forum-rank--image forum-rank--profile" title="' .
                     $name .
                     '"><img src="' .
                     $img_src .
                     '" alt="' .
                     $name .
-                    '" class="mybb-forum-rank-img"></span>';
+                    '" class="forum-rank-img"></span>';
             }
 
-            return '<div class="mybb-forum-rank mybb-forum-rank--image" title="' .
+            return '<div class="forum-rank forum-rank--image" title="' .
                 $name .
                 '"><img src="' .
                 $img_src .
                 '" alt="' .
                 $name .
-                '" class="mybb-forum-rank-img"></div>';
+                '" class="forum-rank-img"></div>';
         }
 
-        $icon_html = '<i class="' . $icon . ' mybb-forum-rank-icon"></i>';
+        $icon_html = '<i class="' . $icon . ' forum-rank-icon"></i>';
 
         if ($context === "profile") {
-            return '<span class="mybb-forum-rank mybb-forum-rank--text mybb-forum-rank--profile" style="border-color:' .
+            return '<span class="forum-rank forum-rank--text forum-rank--profile" style="border-color:' .
                 $color .
                 "40;background:" .
                 $color .
@@ -229,7 +253,7 @@ if (!function_exists("forum_rank_render_badge_html")) {
                 "</span></span>";
         }
 
-        return '<div class="mybb-forum-rank mybb-forum-rank--text" style="background-color:' .
+        return '<div class="forum-rank forum-rank--text" style="background-color:' .
             $color .
             ';">' .
             $icon_html .
@@ -304,9 +328,17 @@ if (!function_exists("forum_get_user_rank")) {
 
         global $db;
         $users_table = forum_users_table();
-        $user = $db->super_query(
-            "SELECT forum_points, forum_manual_rank_id FROM `{$users_table}` WHERE user_id='{$user_id}'",
-        );
+
+        // Kullanıcı satırı istek boyunca önbelleğe alınır (aynı üyenin çok mesajı için tek sorgu)
+        static $user_cache = [];
+        if (array_key_exists($user_id, $user_cache)) {
+            $user = $user_cache[$user_id];
+        } else {
+            $user = $db->super_query(
+                "SELECT forum_points, forum_manual_rank_id FROM `{$users_table}` WHERE user_id='{$user_id}'",
+            );
+            $user_cache[$user_id] = $user;
+        }
         if (!$user) {
             return null;
         }

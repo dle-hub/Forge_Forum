@@ -16,9 +16,16 @@ if( !defined( 'DATALIFEENGINE' ) ) die( "Hacking attempt!" );
 $q       = isset($_GET['q']) ? trim($_GET['q']) : '';
 $mode    = isset($_GET['mode']) ? totranslit($_GET['mode']) : '';
 $in      = isset($_GET['in']) ? totranslit($_GET['in']) : 'topics'; // topics veya posts
+$author  = isset($_GET['author']) ? trim((string) $_GET['author']) : '';
+$date_from = isset($_GET['date_from']) ? trim((string) $_GET['date_from']) : '';
+$date_to   = isset($_GET['date_to']) ? trim((string) $_GET['date_to']) : '';
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_from)) { $date_from = ''; }
+if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date_to))   { $date_to = ''; }
 $page    = isset($_GET['page']) ? max(1,intval($_GET['page'])) : 1;
 $perpage = 25;
 $offset  = ($page-1) * $perpage;
+
+$has_search = (!empty($q) || !empty($mode) || $author !== '' || $date_from !== '' || $date_to !== '');
 
 $results = array();
 $total   = 0;
@@ -34,27 +41,38 @@ $forum_speedbar[''] = $lang['forum_search_breadcrumb'];
 // -------------------------------------------------
 // 3. ARAMA VEYA FİLTRELEME YAP
 // -------------------------------------------------
-if( !empty($q) || !empty($mode) ) {
+if( $has_search ) {
     
     if( !empty($mode) ) {
         if( $mode === 'new' ) {
             $metatags['title'] = sprintf($lang['forum_search_new_title'], $forum_title);
             $forum_speedbar[''] = $lang['forum_search_new_breadcrumb'];
-            
-            $cnt_row = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics WHERE is_deleted=0 AND is_approved=1");
-            $total = min(50, intval($cnt_row['cnt']));
-            
+
+            // Okunmamis (session bazli) filtre — category.php/topic.php ile ayni mantik:
+            // konu goruntulendiginde $_SESSION['forum_read_<id>'] = last_post_date olarak isaretlenir.
+            // Okunmamis = hic goruntulenmemis VEYA son mesaj tarihi okunma tarihinden yeni.
+            $unread = array();
+            $db->query(
+                "SELECT t.*, u.name AS author_name, c.name AS cat_name
+                 FROM " . PREFIX . "_forum_topics t
+                 LEFT JOIN " . PREFIX . "_users u ON u.user_id = t.user_id
+                 LEFT JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
+                 WHERE t.is_deleted = 0 AND t.is_approved = 1
+                 ORDER BY t.last_bump_date DESC
+                 LIMIT 300"
+            );
+            while( $row = $db->get_row() ) {
+                $read_key  = "forum_read_" . intval($row['id']);
+                $last_read = isset($_SESSION[$read_key]) ? $_SESSION[$read_key] : null;
+                $last_post = !empty($row['last_post_date']) ? $row['last_post_date'] : $row['date'];
+                if( !$last_read OR $last_post > $last_read ) {
+                    $unread[] = $row;
+                }
+            }
+
+            $total = count($unread);
             if( $total > 0 ) {
-                $db->query(
-                    "SELECT t.*, u.name AS author_name, c.name AS cat_name
-                     FROM " . PREFIX . "_forum_topics t
-                     LEFT JOIN " . PREFIX . "_users u ON u.user_id=t.user_id
-                     LEFT JOIN " . PREFIX . "_forum_cats c ON c.id=t.cat_id
-                     WHERE t.is_deleted=0 AND t.is_approved=1
-                     ORDER BY t.last_bump_date DESC
-                     LIMIT {$offset}, {$perpage}"
-                );
-                while($row=$db->get_row()) $results[] = $row;
+                $results = array_slice($unread, $offset, $perpage);
             }
         } elseif( $mode === 'today' ) {
             $metatags['title'] = sprintf($lang['forum_search_today_title'], $forum_title);
@@ -78,25 +96,46 @@ if( !empty($q) || !empty($mode) ) {
             }
         }
     } else {
-        // Standart kelime araması (Min 3 karakter)
-        if( mb_strlen($q) < 3 ) {
+        // Kelime / yazar / tarih filtreli arama (kelime varsa min 3 karakter)
+        if( !empty($q) && mb_strlen($q) < 3 ) {
             msgbox( $lang['forum_err_title'], $lang['forum_search_min_len'] );
             return;
         }
 
         $safe_q = $db->safesql( $q );
-        $metatags['title'] = sprintf($lang['forum_search_results_title'], htmlspecialchars($q, ENT_QUOTES, 'UTF-8'), $forum_title);
+        if( !empty($q) ) {
+            $metatags['title'] = sprintf($lang['forum_search_results_title'], htmlspecialchars($q, ENT_QUOTES, 'UTF-8'), $forum_title);
+        }
+
+        // Yazar filtresi: kullanıcı adını id'ye çevir
+        $author_ok = false;
+        $author_id = 0;
+        if( $author !== '' ) {
+            $author_sql = $db->safesql( $author );
+            $arow = $db->super_query( "SELECT user_id FROM " . USERPREFIX . "_users WHERE name='{$author_sql}'" );
+            if( $arow && !empty($arow['user_id']) ) {
+                $author_id = intval( $arow['user_id'] );
+                $author_ok = true;
+            }
+        }
 
         if( $in === 'topics' ) {
-            // Konu başlıklarında veya etiketlerde ara
-            $total = $db->super_query(
-                "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics
-                 WHERE (title LIKE '%{$safe_q}%' OR id IN (
+            // Konu başlıklarında / etiketlerde ara + yazar + tarih
+            $w = "t.is_deleted=0 AND t.is_approved=1";
+            if( !empty($q) ) {
+                $w .= " AND (t.title LIKE '%{$safe_q}%' OR t.id IN (
                      SELECT tt.topic_id FROM " . PREFIX . "_forum_topic_tags tt
                      INNER JOIN " . PREFIX . "_forum_tags tag ON tag.id = tt.tag_id
                      WHERE tag.name = '{$safe_q}' OR tag.alt_name = '{$safe_q}'
-                 )) AND is_deleted=0 AND is_approved=1"
-            );
+                 ))";
+            }
+            if( $author !== '' ) {
+                $w .= $author_ok ? " AND t.user_id='{$author_id}'" : " AND t.user_id='-1'";
+            }
+            if( $date_from !== '' ) $w .= " AND t.date >= '{$date_from} 00:00:00'";
+            if( $date_to !== '' )   $w .= " AND t.date <= '{$date_to} 23:59:59'";
+
+            $total = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics t WHERE {$w}");
             $total = intval($total['cnt']);
 
             if($total > 0) {
@@ -105,21 +144,26 @@ if( !empty($q) || !empty($mode) ) {
                      FROM " . PREFIX . "_forum_topics t
                      LEFT JOIN " . PREFIX . "_users u ON u.user_id=t.user_id
                      LEFT JOIN " . PREFIX . "_forum_cats c ON c.id=t.cat_id
-                     WHERE (t.title LIKE '%{$safe_q}%' OR t.id IN (
-                         SELECT tt.topic_id FROM " . PREFIX . "_forum_topic_tags tt
-                         INNER JOIN " . PREFIX . "_forum_tags tag ON tag.id = tt.tag_id
-                         WHERE tag.name = '{$safe_q}' OR tag.alt_name = '{$safe_q}'
-                     )) AND t.is_deleted=0 AND t.is_approved=1
+                     WHERE {$w}
                      ORDER BY t.last_bump_date DESC
                      LIMIT {$offset}, {$perpage}"
                 );
                 while($row=$db->get_row()) $results[] = $row;
             }
         } else {
-            // Mesaj içeriklerinde ara
+            // Mesaj içeriklerinde ara + yazar + tarih
+            $w = "p.is_deleted=0 AND p.is_approved=1 AND t.is_deleted=0 AND t.is_approved=1";
+            if( !empty($q) ) $w .= " AND p.text LIKE '%{$safe_q}%'";
+            if( $author !== '' ) {
+                $w .= $author_ok ? " AND p.user_id='{$author_id}'" : " AND p.user_id='-1'";
+            }
+            if( $date_from !== '' ) $w .= " AND p.date >= '{$date_from} 00:00:00'";
+            if( $date_to !== '' )   $w .= " AND p.date <= '{$date_to} 23:59:59'";
+
             $total = $db->super_query(
-                "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_posts
-                 WHERE text LIKE '%{$safe_q}%' AND is_deleted=0 AND is_approved=1"
+                "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_posts p
+                 INNER JOIN " . PREFIX . "_forum_topics t ON t.id=p.topic_id
+                 WHERE {$w}"
             );
             $total = intval($total['cnt']);
 
@@ -128,8 +172,8 @@ if( !empty($q) || !empty($mode) ) {
                     "SELECT p.*, u.name AS author_name, t.title AS topic_title, t.alt_name AS topic_alt, t.id AS tid
                      FROM " . PREFIX . "_forum_posts p
                      LEFT JOIN " . PREFIX . "_users u ON u.user_id=p.user_id
-                     LEFT JOIN " . PREFIX . "_forum_topics t ON t.id=p.topic_id
-                     WHERE p.text LIKE '%{$safe_q}%' AND p.is_deleted=0 AND p.is_approved=1
+                     INNER JOIN " . PREFIX . "_forum_topics t ON t.id=p.topic_id
+                     WHERE {$w}
                      ORDER BY p.date DESC
                      LIMIT {$offset}, {$perpage}"
                 );
@@ -151,6 +195,10 @@ if($pages > 1) {
         $link = "?do=forum&action=search&page=" . $i;
         if (!empty($q)) $link .= "&q=" . urlencode($q) . "&in=" . $in;
         if (!empty($mode)) $link .= "&mode=" . urlencode($mode);
+        if ($author !== '') $link .= "&author=" . urlencode($author);
+        if ($date_from !== '') $link .= "&date_from=" . urlencode($date_from);
+        if ($date_to !== '') $link .= "&date_to=" . urlencode($date_to);
+        if (empty($q) && empty($mode)) $link .= "&in=" . $in;
         $pagination .= '<a href="' . $link . '" class="px-3 py-1.5 text-sm rounded border '.$act.'">'.$i.'</a>';
     }
     $pagination .= '</div>';
@@ -160,7 +208,7 @@ if($pages > 1) {
 // 5. SONUÇ HTML
 // -------------------------------------------------
 $results_html = '';
-if( ( !empty($q) || !empty($mode) ) && count($results) ) {
+if( $has_search && count($results) ) {
     foreach($results as $r) {
         if($in === 'topics') {
             $r_title = htmlspecialchars(stripslashes($r['title']), ENT_QUOTES, 'UTF-8');
@@ -168,27 +216,24 @@ if( ( !empty($q) || !empty($mode) ) && count($results) ) {
             $r_cat   = htmlspecialchars($r['cat_name']?:'—', ENT_QUOTES, 'UTF-8');
             $r_url   = $config['http_home_url'].'forum/topic/'.$r['id'].'-'.$r['alt_name'].'.html';
             $results_html .= <<<R
-            <div class="mybb-row">
-                <div class="mybb-col-forum">
-                    <div class="mybb-indicator"><span class="mybb-double-circle"></span></div>
-                    <div class="mybb-forum-info">
-                        <div class="mybb-forum-name"><a href="{$r_url}">{$r_title}</a></div>
-                        <div class="mybb-forum-desc">Kategori: {$r_cat} &nbsp;•&nbsp; Yazar: {$r_author}</div>
+            <article class="forum-node">
+                <span class="icon-action forum-node__icon" aria-hidden="true"><i class="fa fa-comment"></i></span>
+                <div class="forum-node__info">
+                    <h3 class="forum-node__title"><a href="{$r_url}">{$r_title}</a></h3>
+                    <div class="forum-node__meta">
+                        <span class="meta-item">Kategori: {$r_cat}</span>
+                        <span class="meta-dot" aria-hidden="true"></span>
+                        <span class="meta-item">Yazar: {$r_author}</span>
                     </div>
                 </div>
-                <div class="mybb-col-stats">
-                    <div class="mybb-stats-box">
-                        <div class="mybb-stats-item"><span>{$lang['forum_search_col_replies']}</span> <span class="mybb-stats-num">{$r['replies']}</span></div>
-                        <div class="mybb-stats-item"><span>{$lang['forum_search_col_views']}</span> <span class="mybb-stats-num">{$r['views']}</span></div>
-                    </div>
+                <div class="forum-node__stats">
+                    <span class="forum-node__stat">{$lang['forum_search_col_replies']} <b>{$r['replies']}</b></span>
+                    <span class="forum-node__stat">{$lang['forum_search_col_views']} <b>{$r['views']}</b></span>
                 </div>
-                <div class="mybb-col-lastpost">
-                    <div class="mybb-lastpost-card">
-                        <div class="mybb-lastpost-title"><a href="{$r_url}">{$lang['forum_search_col_lastpost']}</a></div>
-                        <div class="mybb-lastpost-meta">{$r['last_bump_date']}</div>
-                    </div>
+                <div class="forum-node__last">
+                    <span class="forum-node__lastmeta">{$r['last_bump_date']}</span>
                 </div>
-            </div>
+            </article>
 R;
         } else {
             $r_text = htmlspecialchars(mb_substr(strip_tags(stripslashes($r['text'])),0,120), ENT_QUOTES, 'UTF-8');
@@ -196,30 +241,27 @@ R;
             $r_author=htmlspecialchars($r['author_name']?:$lang['forum_ajax_quote_guest'], ENT_QUOTES, 'UTF-8');
             $r_url  = forum_topic_post_url($r['tid'], $r['topic_alt'], intval($r['id']));
             $results_html .= <<<R
-            <div class="mybb-row">
-                <div class="mybb-col-forum">
-                    <div class="mybb-indicator"><span class="mybb-double-circle"></span></div>
-                    <div class="mybb-forum-info">
-                        <div class="mybb-forum-name"><a href="{$r_url}">Konu: {$r_topic}</a></div>
-                        <div class="mybb-forum-desc">Yazan: {$r_author} &nbsp;•&nbsp; Mesaj: {$r_text}...</div>
+            <article class="forum-node">
+                <span class="icon-action forum-node__icon" aria-hidden="true"><i class="fa fa-comment-o"></i></span>
+                <div class="forum-node__info">
+                    <h3 class="forum-node__title"><a href="{$r_url}">Konu: {$r_topic}</a></h3>
+                    <div class="forum-node__meta">
+                        <span class="meta-item">Yazan: {$r_author}</span>
+                        <span class="meta-dot" aria-hidden="true"></span>
+                        <span class="meta-item">{$r_text}...</span>
                     </div>
                 </div>
-                <div class="mybb-col-stats">
-                    <div class="mybb-stats-box">
-                        <div class="mybb-stats-item"><span>{$lang['forum_search_col_msg_id']}</span> <span class="mybb-stats-num">#{$r['id']}</span></div>
-                    </div>
+                <div class="forum-node__stats">
+                    <span class="forum-node__stat">{$lang['forum_search_col_msg_id']} <b>#{$r['id']}</b></span>
                 </div>
-                <div class="mybb-col-lastpost">
-                    <div class="mybb-lastpost-card">
-                        <div class="mybb-lastpost-title"><a href="{$r_url}">{$lang['forum_search_col_sent']}</a></div>
-                        <div class="mybb-lastpost-meta">{$r['date']}</div>
-                    </div>
+                <div class="forum-node__last">
+                    <span class="forum-node__lastmeta">{$r['date']}</span>
                 </div>
-            </div>
+            </article>
 R;
         }
     }
-} elseif( !empty($q) || !empty($mode) ) {
+} elseif( $has_search ) {
     $results_html = '<div class="p-8 text-center text-gray-400 font-bold">' . $lang['forum_search_no_results'] . '</div>';
 }
 
@@ -227,7 +269,11 @@ R;
 // 6. TPL
 // -------------------------------------------------
 $tpl->load_template( 'forum/search.tpl' );
+forum_set_ui_lang($tpl, $lang);
 $tpl->set( '{q}', htmlspecialchars($q, ENT_QUOTES, 'UTF-8') );
+$tpl->set( '{author}', htmlspecialchars($author, ENT_QUOTES, 'UTF-8') );
+$tpl->set( '{date_from}', htmlspecialchars($date_from, ENT_QUOTES, 'UTF-8') );
+$tpl->set( '{date_to}', htmlspecialchars($date_to, ENT_QUOTES, 'UTF-8') );
 $tpl->set( '{in_topics}', $in==='topics' ? 'checked' : '' );
 $tpl->set( '{in_posts}',  $in==='posts'  ? 'checked' : '' );
 $tpl->set( '{total}', $total );
@@ -235,7 +281,7 @@ $tpl->set( '{results}', $results_html );
 $tpl->set( '{pagination}', $pagination );
 $tpl->set( '{http_home_url}', $config['http_home_url'] );
 
-if( !empty($q) || !empty($mode) ) {
+if( $has_search ) {
     $tpl->set_block("'\\[results\\](.*?)\\[/results\\]'si", "\\1");
 } else {
     $tpl->set_block("'\\[results\\](.*?)\\[/results\\]'si", "");

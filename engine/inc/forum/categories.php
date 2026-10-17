@@ -61,10 +61,74 @@ function forum_parentDropdown($cats, $selected = 0, $exclude_id = 0)
 }
 
 // =================================================================
-// POST: SİL
+// KATEGORİ MODERATÖR YARDIMCILARI
 // =================================================================
+if (!function_exists("forum_admin_sync_cat_mods")) {
+    /**
+     * Kategori moderatörlerini kaydeder. Girdi: virgülle ayrılmış kullanıcı adı veya ID.
+     */
+    function forum_admin_sync_cat_mods($cat_id, $mods_raw)
+    {
+        global $db;
+        $cat_id = intval($cat_id);
+        if ($cat_id <= 0) {
+            return;
+        }
+        $db->query("DELETE FROM " . PREFIX . "_forum_cat_mods WHERE cat_id='{$cat_id}'");
+        $tokens = array_filter(array_map("trim", explode(",", (string) $mods_raw)));
+        $added = [];
+        foreach ($tokens as $tok) {
+            $uid = 0;
+            if (ctype_digit($tok)) {
+                $uid = intval($tok);
+            } else {
+                $nm = $db->safesql($tok);
+                $u = $db->super_query(
+                    "SELECT user_id FROM " . USERPREFIX . "_users WHERE name='{$nm}'",
+                );
+                if ($u && !empty($u["user_id"])) {
+                    $uid = intval($u["user_id"]);
+                }
+            }
+            if ($uid > 0 && !isset($added[$uid])) {
+                $db->query(
+                    "INSERT IGNORE INTO " . PREFIX . "_forum_cat_mods (cat_id, user_id) VALUES ('{$cat_id}','{$uid}')",
+                );
+                $added[$uid] = 1;
+            }
+        }
+    }
+}
+
+if (!function_exists("forum_admin_cat_mods_str")) {
+    /**
+     * Kategori moderatörlerini düzenleme formu için "ad1, ad2" biçiminde döndürür.
+     */
+    function forum_admin_cat_mods_str($cat_id)
+    {
+        global $db;
+        $cat_id = intval($cat_id);
+        if ($cat_id <= 0) {
+            return "";
+        }
+        $names = [];
+        $db->query(
+            "SELECT u.name FROM " . PREFIX . "_forum_cat_mods m
+             INNER JOIN " . USERPREFIX . "_users u ON u.user_id = m.user_id
+             WHERE m.cat_id='{$cat_id}' ORDER BY u.name ASC",
+        );
+        while ($r = $db->get_row()) {
+            $names[] = stripslashes($r["name"]);
+        }
+        return implode(", ", $names);
+    }
+}
+
+// =================================================================
+// POST: SİL
+// ==================================================================
 if ($subaction == "delete" && $cat_id > 0) {
-    if ($_REQUEST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_REQUEST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -103,7 +167,7 @@ if ($subaction == "delete" && $cat_id > 0) {
 // POST: KAYDET / GÜNCELLE
 // =================================================================
 if (isset($_POST["save_cat"])) {
-    if ($_POST["dle_post_hash"] !== $dle_login_hash) {
+    if ($_POST["user_hash"] !== $dle_login_hash) {
         msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']);
         return;
     }
@@ -120,6 +184,7 @@ if (isset($_POST["save_cat"])) {
     $cat_parent = intval($_POST["cat_parent"]);
     $cat_permissions = $db->safesql(trim($_POST["cat_permissions"]));
     $cat_posi = intval($_POST["cat_posi"]);
+    $cat_mods_raw = trim((string) ($_POST["cat_mods"] ?? ""));
 
     if (empty($cat_name)) {
         msg("error", $lang['forum_error_title'], $lang['forum_cat_empty_name']);
@@ -140,6 +205,7 @@ if (isset($_POST["save_cat"])) {
             description='{$cat_description}', icon='{$cat_icon}', posi='{$cat_posi}',
             permissions='{$cat_permissions}' WHERE id='{$cat_id}'",
         );
+        forum_admin_sync_cat_mods($cat_id, $cat_mods_raw);
         msg(
             "success",
             $lang['forum_set_success_title'],
@@ -154,6 +220,7 @@ if (isset($_POST["save_cat"])) {
             (parent_id, name, alt_name, description, icon, posi, permissions)
             VALUES ('{$cat_parent}','{$cat_name}','{$cat_alt_name}','{$cat_description}','{$cat_icon}','{$cat_posi}','{$cat_permissions}')",
         );
+        forum_admin_sync_cat_mods($db->insert_id(), $cat_mods_raw);
         msg(
             "success",
             $lang['forum_set_success_title'],
@@ -194,6 +261,7 @@ if ($cat_id > 0 && $subaction != "delete") {
         $cat_id = 0;
     }
 }
+$cat_mods_val = $cat_id > 0 ? forum_admin_cat_mods_str($cat_id) : "";
 
 // =================================================================
 // DLE NATIVE: DisplayForumCategories
@@ -225,7 +293,7 @@ function DisplayForumCategories($parentid = 0, $sublevelmarker = false)
             $out .= "<b>ID:{$cat["id"]}</b> {$icon_html} {$name}";
             $out .= "<div class=\"pull-right\">{$counts}";
             $out .= "<a href=\"?mod=forum&action=categories&cat_id={$cat["id"]}\"><i title=\"{$lang['forum_btn_edit']}\" class=\"fa fa-pencil-square-o\"></i></a>&nbsp;&nbsp;";
-            $out .= "<a onclick=\"return confirm('{$lang['forum_cat_del_confirm']}');\" href=\"?mod=forum&action=categories&cat_id={$cat["id"]}&subaction=delete&dle_post_hash={$dle_login_hash}\"><i title=\"{$lang['forum_btn_delete']}\" class=\"fa fa-trash-o text-danger\"></i></a>";
+            $out .= "<a onclick=\"return confirm('{$lang['forum_cat_del_confirm']}');\" href=\"?mod=forum&action=categories&cat_id={$cat["id"]}&subaction=delete&user_hash={$dle_login_hash}\"><i title=\"{$lang['forum_btn_delete']}\" class=\"fa fa-trash-o text-danger\"></i></a>";
             $out .= "</div></div>";
             $children = DisplayForumCategories($cat["id"], true);
             $out .= $children;
@@ -248,7 +316,7 @@ function DisplayForumCategories($parentid = 0, $sublevelmarker = false)
   <div class="modal-dialog modal-lg" role="document">
     <div class="modal-content">
       <form method="post" action="?mod=forum&action=categories" autocomplete="off">
-        <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+        <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
         <div class="modal-header ui-dialog-titlebar">
           <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
           <span class="ui-dialog-title" id="newForumCatLabel"><?php echo $lang['forum_cat_new_title']; ?></span>
@@ -307,6 +375,11 @@ function DisplayForumCategories($parentid = 0, $sublevelmarker = false)
               </div>
             </div>
           </div>
+          <div class="form-group">
+            <label><?php echo $lang['forum_cat_mods']; ?></label>
+            <input name="cat_mods" type="text" class="form-control" value="" maxlength="500" placeholder="admin, moderator2">
+            <span class="help-block text-muted text-size-small"><?php echo $lang['forum_cat_mods_desc']; ?></span>
+          </div>
         </div>
         <div class="modal-footer" style="margin-top:-1.39em;">
           <button type="button" class="btn bg-grey-400 btn-sm btn-raised" data-dismiss="modal"><?php echo $lang['forum_btn_cancel']; ?></button>
@@ -336,7 +409,7 @@ function DisplayForumCategories($parentid = 0, $sublevelmarker = false)
   </div>
   <div class="panel-body">
     <form method="post" action="?mod=forum&action=categories&cat_id=<?php echo $cat_id; ?>" class="form-horizontal" autocomplete="off">
-      <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+      <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
       <div class="form-group">
         <label class="control-label col-md-2 col-sm-3"><?php echo $lang['forum_cat_name']; ?> <span class="text-danger">*</span></label>
         <div class="col-md-10 col-sm-9">
@@ -405,6 +478,13 @@ function DisplayForumCategories($parentid = 0, $sublevelmarker = false)
               "UTF-8",
           ); ?>" maxlength="100" type="text" dir="auto" name="cat_permissions">
           <span class="help-block text-muted text-size-small"><?php echo $lang['forum_cat_perms_desc2']; ?></span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label class="control-label col-md-2 col-sm-3"><?php echo $lang['forum_cat_mods']; ?></label>
+        <div class="col-md-10 col-sm-9">
+          <input class="form-control width-350" value="<?php echo htmlspecialchars($cat_mods_val, ENT_QUOTES, "UTF-8"); ?>" maxlength="500" type="text" dir="auto" name="cat_mods">
+          <span class="help-block text-muted text-size-small"><?php echo $lang['forum_cat_mods_desc']; ?></span>
         </div>
       </div>
   </div>

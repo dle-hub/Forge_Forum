@@ -26,8 +26,8 @@ if( !$cat_id ) { msgbox( $lang['forum_err_title'], $lang['forum_cat_not_found'] 
 $category = $db->super_query( "SELECT * FROM " . PREFIX . "_forum_cats WHERE id = '{$cat_id}'" );
 if( !$category['id'] ) { msgbox( $lang['forum_err_title'], $lang['forum_cat_not_found'] ); return; }
 
-// Yetki kontrolü
-if( $category['permissions'] != 'all' && $is_logged ) {
+// Yetki kontrolü (misafir dahil tüm gruplar için geçerli)
+if( $category['permissions'] != 'all' ) {
     $allowed = explode( ',', $category['permissions'] );
     if( !in_array( $member_id['user_group'], $allowed ) ) {
         msgbox( $lang['forum_access_denied'], $lang['forum_cat_no_perm'] );
@@ -47,7 +47,7 @@ $forum_speedbar[ $config['http_home_url'] . 'forum/' . $cat_alt . '/' ] = $cat_n
 // -------------------------------------------------
 // 2. SAYFALAMA
 // -------------------------------------------------
-$perpage = intval( $forum_cfg['topics_per_page'] );
+$perpage = max( 1, intval( $forum_cfg['topics_per_page'] ) );
 $offset  = ( $f_page - 1 ) * $perpage;
 
 $total = $db->super_query(
@@ -95,6 +95,7 @@ while( $row = $db->get_row() ) { $row['is_pinned'] = 0; $topics[] = $row; }
 // 4. TPL'YE GÖNDER
 // -------------------------------------------------
 $tpl->load_template( 'forum/category.tpl' );
+forum_set_ui_lang($tpl, $lang);
 
 $tpl->set( '{cat_name}',         htmlspecialchars( $cat_name, ENT_QUOTES, 'UTF-8' ) );
 $tpl->set( '{cat_description}',  htmlspecialchars( stripslashes( $category['description'] ), ENT_QUOTES, 'UTF-8' ) );
@@ -113,14 +114,35 @@ while ($prow = $db->get_row()) {
 // -------------------------------------------------
 // 5. KONU SATIRLARINI topic_row.tpl İLE DERLE
 // -------------------------------------------------
+// Kalıcı okundu kaydı (readlog) — kullanıcı bazlı
+$read_map = [];
+if ($is_logged && intval($member_id['user_id']) > 0) {
+    $ruid = intval($member_id['user_id']);
+    $db->query("SELECT topic_id, date, last_read_post FROM " . PREFIX . "_forum_readlog WHERE user_id = '{$ruid}'");
+    while ($rr = $db->get_row()) {
+        $read_map[intval($rr['topic_id'])] = [
+            'date'           => $rr['date'],
+            'last_read_post' => intval($rr['last_read_post']),
+        ];
+    }
+}
+
 $topic_rows = '';
 foreach( $topics as $t ) {
 
-    // --- Okundu / Okunmadı Tespiti ---
+    // --- Okundu / Okunmadı Tespiti (kalıcı readlog + oturum fallback) ---
     $topic_read_key = "forum_read_" . $t['id'];
-    $last_read_date = isset($_SESSION[$topic_read_key]) ? $_SESSION[$topic_read_key] : null;
+    $read_info      = $read_map[intval($t['id'])] ?? null;
+    $last_read_date = $read_info['date'] ?? (isset($_SESSION[$topic_read_key]) ? $_SESSION[$topic_read_key] : null);
+    $last_read_post = $read_info['last_read_post'] ?? 0;
     $last_post_date = $t['last_post_date'] ?? $t['date'];
     $is_unread      = !$last_read_date || ($last_post_date > $last_read_date);
+
+    // "İlk okunmamışa git" bağlantısı (rozet özelliği açık + konu okunmamışsa)
+    $show_unread_link = ($is_unread && !empty($forum_cfg['enable_unread_badge']));
+    $first_unread_url = $show_unread_link
+        ? forum_topic_unread_url($t['id'], $t['alt_name'], $last_read_post)
+        : '';
 
     // --- Satır CSS sınıfı ---
     if ($t['is_pinned']) {
@@ -130,11 +152,11 @@ foreach( $topics as $t ) {
         $row_class   = '';
         $title_style = 'opacity: 0.75;';
     } elseif ($is_unread) {
-        $row_class   = 'mybb-row-unread';
-        $title_style = 'font-weight: 700; color: #1d4ed8;';
+        $row_class   = 'forum-row-unread';
+        $title_style = 'font-weight: 700;';
     } else {
         $row_class   = '';
-        $title_style = 'color: #6b7280;';
+        $title_style = '';
     }
 
     // --- Veri ---
@@ -187,11 +209,20 @@ foreach( $topics as $t ) {
         } else {
             $av_src = $config['http_home_url'] . 'uploads/fotos/' . $last_foto;
         }
-        $t_last_avatar = '<img src="' . htmlspecialchars($av_src, ENT_QUOTES, 'UTF-8') . '" alt="' . $last_by . '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--mybb-border-color);flex-shrink:0;">';
+        $t_last_avatar = '<img src="' . htmlspecialchars($av_src, ENT_QUOTES, 'UTF-8') . '" alt="' . $last_by . '" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid var(--forum-border-color);flex-shrink:0;">';
     } else {
-        $t_last_avatar = '<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#e0eaf8;border:2px solid var(--mybb-border-color);flex-shrink:0;"><i class="fa fa-user" style="font-size:13px;color:#93c5fd;"></i></span>';
+        $t_last_avatar = '<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#e0eaf8;border:2px solid var(--forum-border-color);flex-shrink:0;"><i class="fa fa-user" style="font-size:13px;color:#93c5fd;"></i></span>';
     }
     $tpl2->set("{t_last_avatar}",        $t_last_avatar);
+    $tpl2->set("{t_first_unread_url}",   $first_unread_url);
+
+    // "İlk okunmamışa git" bloğu
+    if ($show_unread_link) {
+        $tpl2->set("[t-first-unread]",  "");
+        $tpl2->set("[/t-first-unread]", "");
+    } else {
+        $tpl2->set_block("'\\[t-first-unread\\](.*?)\\[/t-first-unread\\]'si", "");
+    }
 
     // Son mesaj bloğu
     if (!empty($t['last_post_id'])) {
@@ -268,6 +299,57 @@ if( $pages > 1 ) {
     $pagination .= '</div>';
 }
 $tpl->set( '{pagination}', $pagination );
+
+// -------------------------------------------------
+// Kategori okunmamış konu sayısı (rozet)
+// -------------------------------------------------
+$cat_unread = 0;
+if ($is_logged && !empty($forum_cfg['enable_unread_badge'])) {
+    $__umap     = forum_unread_counts_map( intval( $member_id['user_id'] ) );
+    $cat_unread = intval( $__umap[ $cat_id ] ?? 0 );
+}
+$tpl->set( '{cat_unread_count}', $cat_unread );
+if ($cat_unread > 0) {
+    $tpl->set( '[cat-has-unread]', '' );
+    $tpl->set( '[/cat-has-unread]', '' );
+    $tpl->set_block( "'\\[cat-no-unread\\](.*?)\\[/cat-no-unread\\]'si", '' );
+} else {
+    $tpl->set_block( "'\\[cat-has-unread\\](.*?)\\[/cat-has-unread\\]'si", '' );
+    $tpl->set( '[cat-no-unread]', '' );
+    $tpl->set( '[/cat-no-unread]', '' );
+}
+
+// -------------------------------------------------
+// Kategori aboneliği (buton durumu)
+// -------------------------------------------------
+$cat_sub_enabled = ( $is_logged && !empty( $forum_cfg['enable_cat_subscribe'] ) );
+$cat_subscribed  = false;
+if ( $cat_sub_enabled ) {
+    $uid_cs     = intval( $member_id['user_id'] );
+    $cs_row     = $db->super_query( "SELECT id FROM " . PREFIX . "_forum_cat_subs WHERE cat_id='{$cat_id}' AND user_id='{$uid_cs}'" );
+    $cat_subscribed = !empty( $cs_row['id'] );
+}
+
+if ( $cat_sub_enabled ) {
+    $tpl->set( '[cat-sub-enabled]', '' );
+    $tpl->set( '[/cat-sub-enabled]', '' );
+    $tpl->set_block( "'\\[cat-sub-disabled\\](.*?)\\[/cat-sub-disabled\\]'si", '' );
+} else {
+    $tpl->set_block( "'\\[cat-sub-enabled\\](.*?)\\[/cat-sub-enabled\\]'si", '' );
+    $tpl->set( '[cat-sub-disabled]', '' );
+    $tpl->set( '[/cat-sub-disabled]', '' );
+}
+
+if ( $cat_subscribed ) {
+    $tpl->set( '[cat-subscribed]', '' );
+    $tpl->set( '[/cat-subscribed]', '' );
+    $tpl->set_block( "'\\[cat-not-subscribed\\](.*?)\\[/cat-not-subscribed\\]'si", '' );
+} else {
+    $tpl->set_block( "'\\[cat-subscribed\\](.*?)\\[/cat-subscribed\\]'si", '' );
+    $tpl->set( '[cat-not-subscribed]', '' );
+    $tpl->set( '[/cat-not-subscribed]', '' );
+}
+$tpl->set( '{dle_login_hash}', $dle_login_hash );
 
 $tpl->compile('content');
 $tpl->clear();

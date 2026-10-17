@@ -148,6 +148,13 @@ if( $max_per_day > 0 ) {
 $news_id = isset($_REQUEST['news_id']) ? intval($_REQUEST['news_id']) : 0;
 $area = isset($_REQUEST['area']) ? totranslit($_REQUEST['area']) : 'comments';
 $author = isset($_REQUEST['author']) ? strip_tags(urldecode((string)$_REQUEST['author'])) : '';
+
+// JS string baglaminda kullanilacak guvenli temsil (JSON encode -> tirnak/JS kacisi)
+$author_js = json_encode($author, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+if ($author_js === false) {
+    $author_js = '""';
+}
+
 $subaction = isset($_REQUEST['subaction']) ? trim($_REQUEST['subaction']) : '';
 
 function forum_upload_format_quick_response($res) {
@@ -839,7 +846,7 @@ function loadmediauploader() {
 			remember: true,
 			active: 'list'
 		},
-		multipart_params: {"subaction" : "upload", "news_id" : "{$news_id}", "area" : "{$area}", "author" : "{$author}", "user_hash" : dle_login_hash},
+		multipart_params: {"subaction" : "upload", "news_id" : "{$news_id}", "area" : "{$area}", "author" : {$author_js}, "user_hash" : dle_login_hash},
 		ready: function(event, args) {
 			{$im_show}
 		},
@@ -1340,7 +1347,7 @@ function upload_from_url( url ) {
 
 	$('#'+error_id).html( '<span style="color:green;">{$lang['ajax_info']}</span>' );
 
-	$.post( dle_root + "index.php?controller=ajax&mod=forum_upload", { news_id: "{$news_id}", imageurl: copyurl, ftpurl: ftpurl, t_size: t_size, upload_driver: upload_driver, hidpi: hidpi, t_seite: t_seite, make_thumb: make_thumb, m_size: m_size, m_seite: m_seite, make_medium: make_medium, make_watermark: make_watermark, public_file: public_file, area: "{$area}", author: "{$author}", subaction: "upload", user_hash : "{$dle_login_hash}" }, function(data){
+	$.post( dle_root + "index.php?controller=ajax&mod=forum_upload", { news_id: "{$news_id}", imageurl: copyurl, ftpurl: ftpurl, t_size: t_size, upload_driver: upload_driver, hidpi: hidpi, t_seite: t_seite, make_thumb: make_thumb, m_size: m_size, m_seite: m_seite, make_medium: make_medium, make_watermark: make_watermark, public_file: public_file, area: "{$area}", author: {$author_js}, subaction: "upload", user_hash : "{$dle_login_hash}" }, function(data){
 		if ( data.success ) {
 			var returnbox = data.returnbox;
 			returnbox = returnbox.replace(/&lt;/g, "<");
@@ -1368,7 +1375,7 @@ function media_delete_file( file ) {
 		formData.append('user_hash', '{$dle_login_hash}');
 		formData.append('area', '{$area}');
 		formData.append('news_id', '{$news_id}');
-		formData.append('author', '{$author}');
+		formData.append('author', {$author_js});
 		formData.append( file.data('area')+'[]', file.data('deleteid') );
 
 		if( $( '#imagesallowmore' ).length ) {
@@ -1428,7 +1435,7 @@ function media_delete_selected() {
 			formData.append('user_hash', '{$dle_login_hash}');
 			formData.append('area', '{$area}');
 			formData.append('news_id', '{$news_id}');
-			formData.append('author', '{$author}');
+			formData.append('author', {$author_js});
 			
 			$('.file-preview-card.active').each(function(){
 				if( $(this).data('area') == 'shared' ) {

@@ -19,14 +19,14 @@ $subaction = isset($_REQUEST['subaction']) ? totranslit($_REQUEST['subaction']) 
 
 // SIL
 if ( $subaction == 'delete' && $promo_id > 0 ) {
-    if ( $_REQUEST['dle_post_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
+    if ( $_REQUEST['user_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
     $db->query( "DELETE FROM " . PREFIX . "_forum_promotions WHERE id='{$promo_id}'" );
     msg("success", $lang['forum_set_success_title'], $lang['forum_promo_deleted'], "?mod=forum&action=promotions"); return;
 }
 
 // KAYDET
 if ( isset($_POST['save_promo']) ) {
-    if ( $_POST['dle_post_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
+    if ( $_POST['user_hash'] !== $dle_login_hash ) { msg("error", $lang['forum_set_csrf_title'], $lang['forum_set_csrf_desc']); return; }
     $min_pts   = intval($_POST['min_points']);
     $min_posts = intval($_POST['min_posts']);
     $from_grp  = intval($_POST['from_group']);
@@ -68,7 +68,7 @@ function grpDropdown($groups,$sel=0){
   </div>
   <div class="panel-body">
     <form method="post" action="?mod=forum&action=promotions<?php echo $promo_id>0?'&promo_id='.$promo_id:''; ?>" class="form-horizontal">
-      <input type="hidden" name="dle_post_hash" value="<?php echo $dle_login_hash; ?>">
+      <input type="hidden" name="user_hash" value="<?php echo $dle_login_hash; ?>">
       <div class="form-group">
         <label class="control-label col-md-2 col-sm-3"><?php echo $lang['forum_promo_min_pts']; ?></label>
         <div class="col-md-10 col-sm-9"><input class="form-control width-150" type="number" name="min_points" value="<?php echo $edit_promo?intval($edit_promo['min_points']):'0'; ?>"></div>
@@ -124,7 +124,7 @@ function grpDropdown($groups,$sel=0){
                     "href" =>
                         "?mod=forum&action=promotions&promo_id=" .
                         intval($pr["id"]) .
-                        "&subaction=delete&dle_post_hash=" .
+                        "&subaction=delete&user_hash=" .
                         $dle_login_hash,
                     "label" => $lang["forum_btn_delete"],
                     "icon" => "fa fa-trash-o",

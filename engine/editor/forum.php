@@ -256,7 +256,67 @@ if ($editor_type == "froala") {
     };
     window.tinyMCE = window.tinymce;
 
+    // DLE emoji secicisi (iframe) icin TinyMCE kopru genisletmesi
+    window.tinymce.execCommand = function(cmd, ui, val) {
+        if (cmd === 'mceInsertContent') {
+            var ed = window.__dleForumEmojiEditor;
+            if (ed && ed.html && ed.html.insert) {
+                ed.html.insert(val + ' ', true);
+                try { ed.events.focus(); } catch (e) {}
+            }
+        }
+        return true;
+    };
+    window.tinymce.activeEditor = {
+        windowManager: {
+            close: function() {
+                var d = jQuery('#dle-forum-emoji-dialog');
+                if (d.length && d.hasClass('ui-dialog-content')) { d.dialog('close'); }
+            }
+        }
+    };
+
     jQuery(document).ready(function($) {
+        // DLE emoji secicisi: Froala gomulu popup yerine iframe diyalog (pareny TinyMCE API'si ile uyumlu)
+        (function () {
+            var FE = $.FroalaEditor || $.FE;
+            if (!FE || !FE.PLUGINS) { return; }
+            FE.PLUGINS.emoticons = function (editor) {
+                return {
+                    showEmoticonsPopup: function () {
+                        window.__dleForumEmojiEditor = editor;
+                        var lang = (editor.opts && editor.opts.language) ? editor.opts.language : 'tr';
+                        var dlg = $('#dle-forum-emoji-dialog');
+                        if (dlg.length === 0) {
+                            $('body').append('<div id="dle-forum-emoji-dialog" style="display:none;padding:0;overflow:hidden"><iframe id="dle-forum-emoji-frame" style="width:100%;height:100%;border:0;display:block" scrolling="no"></iframe></div>');
+                            dlg = $('#dle-forum-emoji-dialog');
+                            dlg.dialog({
+                                autoOpen: false,
+                                title: 'İfade Ekle',
+                                width: 380,
+                                height: 480,
+                                modal: true,
+                                resizable: false,
+                                dialogClass: 'modalfixed dle-popup-emoji',
+                                create: function () { $('.ui-dialog.dle-popup-emoji').css({ position: 'fixed' }); }
+                            });
+                        }
+                        $('#dle-forum-emoji-frame').attr('src', dle_root + 'index.php?controller=ajax&mod=emotions&lang=' + lang);
+                        dlg.dialog('open');
+                    },
+                    hideEmoticonsPopup: function () {
+                        var d = $('#dle-forum-emoji-dialog');
+                        if (d.length && d.hasClass('ui-dialog-content')) { d.dialog('close'); }
+                    },
+                    insert: function (str) {
+                        editor.popups.hide('emoticons');
+                        editor.selection.restore();
+                        editor.html.insert(' ' + str + ' ', true);
+                    }
+                };
+            };
+        })();
+
         var uploadParams = {
             subaction: 'upload',
             user_hash: dle_login_hash,
@@ -265,6 +325,7 @@ if ($editor_type == "froala") {
 
         var froalaOptions = {
             language: '{$lang_code}',
+            dle_root: dle_root,
             height: {$f_editor_height},
             heightMin: 150,
             heightMax: 600,

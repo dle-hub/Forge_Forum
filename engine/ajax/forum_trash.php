@@ -29,6 +29,13 @@ if( $member_id['user_group'] > 2 ) {
     exit;
 }
 
+// CSRF korumasi (durum degistiren istekler)
+if( empty($_POST['user_hash']) || $_POST['user_hash'] !== $dle_login_hash ) {
+    header('Content-Type: application/json');
+    echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_csrf']]);
+    exit;
+}
+
 header('Content-Type: application/json');
 $action = isset($_POST['action']) ? totranslit($_POST['action']) : '';
 $id     = isset($_POST['id']) ? intval($_POST['id']) : 0;
@@ -76,10 +83,10 @@ switch($action) {
 
         if($type == 'topic') {
             $tid = $id;
+            // Beğenileri önce sil (mesajlar silinince alt sorgu boş döner)
+            $db->query("DELETE FROM ".PREFIX."_forum_likes WHERE post_id IN (SELECT id FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}')");
             // Mesajları sil
             $db->query("DELETE FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}'");
-            // Beğenileri sil
-            $db->query("DELETE FROM ".PREFIX."_forum_likes WHERE post_id IN (SELECT id FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}')");
             // Anket varsa sil
             $poll = $db->super_query("SELECT id FROM ".PREFIX."_forum_polls WHERE topic_id='{$tid}'");
             if($poll['id']) {
@@ -112,11 +119,23 @@ switch($action) {
         $subtype = isset($_POST['subtype']) ? totranslit($_POST['subtype']) : 'all';
 
         if($subtype == 'topics' || $subtype == 'all') {
+            // Once ID'leri topla: dongu icindeki query() cagrilari query_id'yi ezdigi icin
+            // get_row() ilk turdan sonra yanlis sonuca bakardi (yalnizca 1 konu silinirdi).
+            $trash_topic_ids = array();
             $db->query("SELECT id FROM ".PREFIX."_forum_topics WHERE is_deleted=1");
-            while($t = $db->get_row()) {
-                $tid = intval($t['id']);
-                $db->query("DELETE FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}'");
+            while($t = $db->get_row()) { $trash_topic_ids[] = intval($t['id']); }
+
+            foreach($trash_topic_ids as $tid) {
+                // Beğeniler → mesajlar → anket(votes/options/poll) → etiket/abonelik → konu
                 $db->query("DELETE FROM ".PREFIX."_forum_likes WHERE post_id IN (SELECT id FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}')");
+                $db->query("DELETE FROM ".PREFIX."_forum_posts WHERE topic_id='{$tid}'");
+
+                $trash_poll = $db->super_query("SELECT id FROM ".PREFIX."_forum_polls WHERE topic_id='{$tid}'");
+                if (!empty($trash_poll['id'])) {
+                    $tp = intval($trash_poll['id']);
+                    $db->query("DELETE FROM ".PREFIX."_forum_poll_votes WHERE poll_id='{$tp}'");
+                    $db->query("DELETE FROM ".PREFIX."_forum_poll_options WHERE poll_id='{$tp}'");
+                }
                 $db->query("DELETE FROM ".PREFIX."_forum_polls WHERE topic_id='{$tid}'");
                 $db->query("DELETE FROM ".PREFIX."_forum_topic_tags WHERE topic_id='{$tid}'");
                 $db->query("DELETE FROM ".PREFIX."_forum_subs WHERE topic_id='{$tid}'");
@@ -133,6 +152,5 @@ switch($action) {
 
     default:
         echo json_encode(['success'=>false,'error'=>$lang['forum_ajax_unknown_action']]);
-}
 }
 exit;

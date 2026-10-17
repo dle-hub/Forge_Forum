@@ -82,15 +82,23 @@ $cid = intval($topic["cat_id"]);
 // 3. POST İŞLEMİ
 // -------------------------------------------------
 if (isset($_POST["submit_reply"])) {
-    if ($_POST["user_hash"] !== $dle_login_hash) {
+    if (!isset($_POST["user_hash"]) || $_POST["user_hash"] !== $dle_login_hash) {
         msgbox($lang['forum_err_title'], $lang['forum_edit_csrf']);
         return;
     }
 
-    $post_text = trim($_POST["text"]);
+    $post_text = trim($_POST["text"] ?? '');
     if (empty($post_text)) {
         msgbox($lang['forum_err_title'], $lang['forum_edit_empty_text']);
         return;
+    }
+
+    // CAPTCHA / Anti-Spam kontrolü
+    if (function_exists("forum_captcha_active") && forum_captcha_active("reply")) {
+        if (!forum_captcha_check()) {
+            msgbox($lang['forum_err_title'], $lang['forum_captcha_fail'] ?? $lang['recaptcha_fail']);
+            return;
+        }
     }
 
     // Flood kontrolü
@@ -168,6 +176,11 @@ if (isset($_POST["submit_reply"])) {
     if (!$new_post_id) {
         msgbox($lang['forum_err_title'], $lang['forum_reply_failed']);
         return;
+    }
+
+    // Otomatik abonelik (yanıt yazan kullanıcı)
+    if (!empty($forum_cfg["enable_subscriptions"]) && $uid > 0) {
+        $db->query("INSERT IGNORE INTO " . PREFIX . "_forum_subs (topic_id, user_id, date) VALUES ('{$tid}', '{$uid}', '{$now}')");
     }
 
     // Link uploads made during reply creation to the newly created post
@@ -249,7 +262,9 @@ if (isset($_POST["submit_reply"])) {
 
     // 5. Abonelere bildirim (varsa)
     if ($forum_cfg["enable_notifications"]) {
-        $subs = [];
+        // Not: satırlar önce toplanır; döngü içinde INSERT yapmak DLE'nin
+        // $db->query_id değerini ezip sonraki get_row() çağrısını bozar.
+        $sub_rows = [];
         $db->query(
             "SELECT user_id FROM " .
                 PREFIX .
@@ -257,12 +272,15 @@ if (isset($_POST["submit_reply"])) {
             WHERE topic_id = '{$tid}' AND user_id != '{$uid}'",
         );
         while ($s = $db->get_row()) {
+            $sub_rows[] = intval($s["user_id"]);
+        }
+        foreach ($sub_rows as $sub_uid) {
             $db->query(
                 "INSERT INTO " .
                     PREFIX .
                     "_forum_notifs
                 (user_id, from_user, type, topic_id, post_id, date)
-                VALUES ('{$s["user_id"]}','{$uid}','reply','{$tid}','{$new_post_id}',NOW())",
+                VALUES ('{$sub_uid}','{$uid}','reply','{$tid}','{$new_post_id}',NOW())",
             );
         }
     }
@@ -278,6 +296,11 @@ if (isset($_POST["submit_reply"])) {
         );
     }
 
+    // 7. Abonelere e-posta bildirimi (yalnızca onaylı mesajlar için)
+    if ($approved) {
+        forum_notify_reply_email($topic, $new_post_id, $uid, $post_text);
+    }
+
     // Yönlendir: son sayfa + anchor
     $total_posts = $db->super_query(
         "SELECT COUNT(*) AS cnt FROM " .
@@ -286,7 +309,7 @@ if (isset($_POST["submit_reply"])) {
         WHERE topic_id = '{$tid}' AND is_deleted = 0 AND is_approved = 1",
     );
     $total_posts = intval($total_posts["cnt"]);
-    $perpage = intval($forum_cfg["posts_per_page"]);
+    $perpage = max(1, intval($forum_cfg["posts_per_page"]));
     $last_page = ceil($total_posts / $perpage);
 
     if ($config["allow_alt_url"]) {
@@ -320,6 +343,11 @@ if (isset($_POST["submit_reply"])) {
     }
 
     $redirect .= "#post-" . $new_post_id;
+
+    // Taslağı temizle (başarıyla gönderildi)
+    $db->query(
+        "DELETE FROM " . PREFIX . "_forum_drafts WHERE user_id='{$uid}' AND type='reply' AND topic_id='{$tid}'",
+    );
 
     header("Location: {$redirect}");
     exit();
