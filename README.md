@@ -18,13 +18,21 @@ templates/{skin}/forum/
 ├── post.tpl               → Tek mesaj satırı (konu içinde)
 ├── profile.tpl            → Üye forum profili
 ├── new_topic.tpl          → Yeni konu formu
-├── edit.tpl               → Mesaj düzenleme formu
+├── edit.tpl               → Mesaj / konu düzenleme formu
 ├── search.tpl             → Arama sayfası
 ├── notifications.tpl      → Bildirimler listesi
 ├── notification_row.tpl   → Tek bildirim satırı
-├── forum.css              → Forum stilleri (Forum tarzı)
-└── forum.js               → Kategori kartı aç/kapa vb.
+├── statistics.tpl         → Detaylı istatistik sayfası
+├── subscriptions.tpl      → Abonelikler sayfası
+├── tag.tpl                → Etiket sayfası
+├── online.tpl             → Kimler çevrimiçi sayfası
+├── mod.tpl                → Ön yüz moderasyon paneli
+├── history.tpl            → Düzenleme geçmişi
+├── forum.css              → Forum stilleri
+└── forum.js               → Toolbar, katlanır bloklar ve AJAX yardımcıları
 ```
+
+> Paket iki hazır set içerir: **`templates/air_tema`** (Air teması) ve **`templates/Default`**. Aktif temanızın adıyla `templates/{skin}/forum/` altına kopyalayın.
 
 **Dil dosyaları:**
 
@@ -91,6 +99,20 @@ Bu etiketler `init.php` ve `forum.php` üzerinden tüm forum sayfalarına uygula
 |--------|----------------|
 | `{forum_notif_count}` | Okunmamış bildirim sayısı (sadece `[has-forum-notifs]` içinde anlamlı). |
 
+### Arayüz metin etiketleri (`forum_set_ui_lang`)
+
+Ön yüz şablonlarındaki etiketler, butonlar ve placeholder'lar sabit metin içermez. `engine/modules/forum/editor_helpers.php` içindeki **`forum_set_ui_lang($tpl, $lang)`** fonksiyonu, aşağıdaki etiket gruplarını `language/{dil}/forum.lng` dosyasından doldurur:
+
+| Etiket grubu | Örnek | Kapsam |
+|--------------|-------|--------|
+| `{forum_ui_*}` | `{forum_ui_new_topic}`, `{forum_ui_topic_edit}` | Ortak arayüz: toolbar, butonlar, konu işlemleri, JS mesajları |
+| `{forum_stats_*}` | `{forum_stats_today_topics}` | İstatistik sayfası etiketleri |
+| `{forum_search_*}` | `{forum_search_btn}` | Arama formu ve sonuç başlıkları |
+| `{forum_new_*}` | `{forum_new_title_label}` | Yeni konu formu |
+| `{forum_edit_*}` | `{forum_edit_save}` | Mesaj / konu düzenleme formu |
+
+> Yeni bir arayüz metni eklerken önce `forum.lng` dosyasına anahtarı ekleyin, ardından `forum_set_ui_lang()` haritasına tag → anahtar eşlemesini yazın ve şablonda `{tag}` kullanın.
+
 ### Tema rengi (otomatik enjekte)
 
 Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlandığında `init.php` şunu ekler:
@@ -113,11 +135,13 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `{categories}` | Tüm kategori bloklarının birleşik HTML çıktısı (içinde `subforum_row.tpl` satırları). |
 | `{forum_title}` | Forum başlığı metni (`Forum`). |
 | `{online_summary}` | “Son 15 dakikada aktif: X üye” özeti. |
-| `{online_list}` | Çevrimiçi üye linkleri (virgülle ayrılmış). |
+| `{online_list}` | Çevrimiçi üyelerin **avatarlı çip** HTML’i (`forum-online-chip`). |
 | `{total_posts}` | Toplam mesaj sayısı. |
 | `{total_threads}` | Toplam konu sayısı. |
 | `{total_members}` | Toplam üye sayısı. |
 | `{newest_member}` | En yeni üyenin adı (linkli HTML). |
+
+**Toolbar ve alt istatistik paneli:** Ana sayfa toolbar’ı `{forum_ui_new_posts}`, `{forum_ui_today_posts}`, `{forum_ui_online}`, `{forum_ui_stats_nav}`, `{forum_ui_notifications}`, `{forum_ui_subscriptions}`, `{forum_ui_moderation}`, `{forum_ui_mark_all_read}` etiketlerini kullanır. Alt blokta `{forum_ui_forum_stats}`, `{forum_ui_full_list}`, `{forum_ui_topic_label}`, `{forum_ui_posts_label}`, `{forum_ui_members_label}` ve `{forum_ui_newest_member}` bulunur.
 
 ---
 
@@ -165,6 +189,17 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `{cat_id}` | Kategori ID. |
 | `{topic_rows}` | `topic_row.tpl` satırlarının birleşimi veya boş mesaj. |
 | `{pagination}` | Sayfa numaraları HTML. |
+| `{cat_unread_count}` | Kategorideki okunmamış konu sayısı. |
+| `{forum_notif_count}` | Okunmamış bildirim sayısı. |
+
+| Blok | Koşul |
+|------|--------|
+| `[cat-has-unread]` | Kategoride okunmamış konu varsa |
+| `[cat-sub-enabled]` | Kategori aboneliği özelliği açıksa |
+| `[cat-subscribed]` | Kullanıcı bu kategoriye aboneyse |
+| `[cat-not-subscribed]` | Kullanıcı bu kategoriye abone değilse |
+
+**Toolbar etiketleri:** `{forum_ui_notifications}`, `{forum_ui_mark_read}`, `{forum_ui_cat_subscribe}`, `{forum_ui_cat_unsubscribe}`, `{forum_ui_new_topic}`, `{forum_ui_category_topics}`. JS: `forumMarkRead(cat_id)`, `forumToggleCatSub(cat_id)`.
 
 ---
 
@@ -224,14 +259,28 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `{pin_label}` | “Sabitle” / “Sabitlemeyi Kaldır” (dilden). |
 | `{lock_label}` | “Kilitle” / “Kilidi Aç”. |
 | `{mod_display}` | Mod araçları: `block` veya `none`. |
+| `{mod_label}` | Menü başlığı: “Yönetici” veya (yalnızca konu sahibi için) “Konu İşlemleri”. |
+| `{topic_edit_url}` | “Konuyu Düzenle” bağlantısı — ilk mesajın düzenleme formuna gider. |
+| `{solve_label}` | “Çözüldü olarak işaretle” / “Çözüldü işaretini kaldır”. |
+| `{viewing_count}` | Konuyu son 2 dakikada görüntüleyen üye sayısı. |
+| `{viewing_users}` | Görüntüleyen üyelerin link listesi. |
+| `{similar_topics}` | Benzer konular HTML’i. |
 
 | Blok | Koşul |
 |------|--------|
 | `[topic-pinned]` | Konu sabit |
 | `[topic-locked]` | Konu kilitli |
+| `[topic-solved]` | Konu çözüldü olarak işaretli |
 | `[allow-bump]` | Kullanıcı konuyu öne çıkarabilir |
+| `[can-edit-topic]` | Kullanıcı konuyu düzenleyebilir (yönetici, yetkili kategori moderatörü veya izinli konu sahibi) |
+| `[can-moderate-topic]` | Kullanıcı sabitleme, kilitleme, taşıma, birleştirme, bölme ve çöpe atma yapabilir |
+| `[can-solve]` | Kullanıcı konuyu çözüldü işaretleyebilir |
+| `[has-similar]` | Benzer konu varsa |
+| `[has-viewers]` | Konuyu görüntüleyen üye varsa |
 | `[not-group=5]...[/not-group]` | Misafir olmayan — hızlı cevap formu |
 | `[group=5]...[/group]` | Misafir — giriş/kayıt uyarısı |
+
+> **Konu düzenleme izinleri:** Yönetim > Forum > Ayarlar altındaki **Konu Sahibi Düzenleyebilsin** ve **Kategori Moderatörleri Düzenleyebilsin** anahtarlarına bağlıdır. Konu sahibi başlık, önek, etiket ve ilk mesajı düzenleyebilir; **kategori taşıyamaz**. Kategori değişikliği yalnızca moderatörlerde görünür (`[can-move-topic]`).
 
 **Gömülü JavaScript fonksiyonları** (`topic.tpl` içinde):
 
@@ -241,6 +290,10 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `forumQuotePost(id)` | Alıntı AJAX |
 | `forumReportPost(id)` | Şikayet gönder |
 | `modAction(action, data)` | Sabitle, kilitle, sil, bump |
+| `forumToggleSubscribe(topicId)` | Konu aboneliği aç/kapat |
+| `forumToggleSolved(topicId)` | Çözüldü işaretini aç/kapat |
+| `forumModMove()` / `forumModMerge()` / `forumModSplit()` | Konu taşı / birleştir / böl |
+| `forumInsertMultiquotes()` | Çoklu alıntıları editöre ekle |
 | `handleForumUpload(input)` | Hızlı cevap dosya yükleme |
 | `triggerForumUpload()` | Dosya seçiciyi aç |
 
@@ -346,6 +399,11 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `{prefix_selector}` | Hazır `<select name="prefix_id">` HTML. |
 | `{cat_id}` | Ön seçili kategori ID. |
 | `{cat_name}` | Ön seçili kategori adı. |
+| `{topic_captcha}` | CAPTCHA / anti-spam alanı (ayar ve grup iznine bağlı). |
+| `{drafts_enabled}` | Taslak özelliği açıksa `true`. |
+| `{dle_login_hash}` | Form CSRF hash'i. |
+
+> Form etiketleri, placeholder'lar ve buton metinleri `{forum_new_*}` / `{forum_ui_*}` etiketleriyle dil dosyasından gelir. CAPTCHA yalnızca ilgili ayar ve grubun **Resim doğrulaması** izni açıksa gösterilir.
 
 **Form alanları (şablonda sabit):** `title`, `text`, `tags`, `poll_question`, `poll_options`, `poll_max_choices`, `poll_days`, `poll_multiple`, `submit_topic`, `user_hash`.
 
@@ -376,6 +434,9 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | Blok | Koşul |
 |------|--------|
 | `[first_post]` | Düzenlenen mesaj konunun ilk mesajı — başlık, kategori, anket alanları |
+| `[can-move-topic]` | Kategori seçiciyi göster (yalnızca yönetici / moderatör / kategori moderatörü) |
+
+> **Yetki:** Konu sahibi kendi konusunun başlığını, öneğini, etiketlerini ve ilk mesajını düzenleyebilir; kategori taşıyamaz. Kategori moderatörleri yalnızca yetkili oldukları kategoride düzenleme yapabilir. İlk mesaj düzenlenirken anket seçenekleri silinip yeniden oluşturulmaz — **oylar korunur**.
 
 ---
 
@@ -425,8 +486,102 @@ Admin panelinden **Kategori Kart Başlık Rengi** (`theme_header_color`) ayarlan
 | `[type-reply]` | Cevap bildirimi |
 | `[type-like]` | Beğeni bildirimi |
 | `[type-mention]` | @mention bildirimi |
+| `[type-follow_topic]` | Takip edilen üye yeni konu açtı |
+| `[type-cat_topic]` | Abone olunan kategoride yeni konu açıldı |
 | `[notif-unread]` | Okunmamış |
 | `[notif-read]` | Okunmuş |
+
+---
+
+### 5.12 `statistics.tpl` — Detaylı istatistikler
+
+**Action:** `statistics.php`  
+**URL:** `?do=forum&action=statistics`
+
+| Etiket | Ne işe yarar |
+|--------|----------------|
+| `{stats_title}` | Sayfa başlığı. |
+| `{stat_topics}` / `{stat_posts}` / `{stat_members}` | Genel toplamlar. |
+| `{stat_topics_today}` / `{stat_posts_today}` | Bugünkü konu / mesaj. |
+| `{stat_per_day}` | Günlük ortalama mesaj. |
+| `{stat_members_label}` | “Üye” etiketi (dilden). |
+| `{stat_newest}` | En yeni üye (linkli HTML). |
+| `{stats_cat_title}` + `{stats_categories}` | Kategori tablosu. |
+| `{stats_posters_title}` + `{stats_top_posters}` | En aktif üyeler. |
+| `{stats_viewed_title}` + `{stats_top_viewed}` | En çok görüntülenen konular. |
+| `{stats_replied_title}` + `{stats_top_replied}` | En çok cevaplanan konular. |
+
+---
+
+### 5.13 `subscriptions.tpl` — Abonelikler
+
+**Action:** `subscriptions.php`  
+**URL:** `?do=forum&action=subscriptions`
+
+| Etiket | Ne işe yarar |
+|--------|----------------|
+| `{sub_title}` | Sayfa başlığı. |
+| `{sub_count}` | Abonelik sayısı. |
+| `{subscription_rows}` | Abonelik satırları HTML. |
+
+---
+
+### 5.14 `tag.tpl` — Etiket sayfası
+
+**Action:** `tag.php`  
+**URL:** `/forum/etiket/{tag}/`
+
+| Etiket | Ne işe yarar |
+|--------|----------------|
+| `{tag_name}` | Etiket adı. |
+| `{topic_rows}` | Etikete ait konu satırları. |
+| `{pagination}` | Sayfalama. |
+
+---
+
+### 5.15 `online.tpl` — Kimler çevrimiçi
+
+**Action:** `online.php`  
+**URL:** `?do=forum&action=online`
+
+| Etiket | Ne işe yarar |
+|--------|----------------|
+| `{online_title}` | Sayfa başlığı. |
+| `{online_count}` | Çevrimiçi üye sayısı. |
+| `{online_rows}` | Üye satırları (avatar + ad + grup). |
+
+---
+
+### 5.16 `mod.tpl` — Ön yüz moderasyon paneli
+
+**Action:** `mod.php`  
+**URL:** `?do=forum&action=mod`  
+**Yetki:** Yönetici, moderatör veya kategori moderatörü.
+
+| Etiket | Ne işe yarar |
+|--------|----------------|
+| `{mod_title}` | Panel başlığı. |
+| `{pending_count}` / `{pending_posts}` | Onay bekleyen konu / mesaj sayısı. |
+| `{report_count}` | Açık şikayet sayısı. |
+| `{pending_rows}` / `{report_rows}` | Onay ve şikayet satırları. |
+| `{admin_approval_url}` / `{admin_reports_url}` / `{admin_topics_url}` | Yönetim paneli kısayolları. |
+
+**JS:** `forumBulkApproval('approve'|'reject')`, `forumApproveTopic(id)`, `forumRejectTopic(id)`, `forumReportResolve(id)`, `forumReportTrash(id)`.
+
+---
+
+### 5.17 `history.tpl` — Düzenleme geçmişi
+
+**Action:** `history.php`  
+**URL:** `?do=forum&action=history&post_id={id}`
+
+| Etiket | Ne işe yarar |
+|--------|----------------|
+| `{history_title}` | Sayfa başlığı. |
+| `{topic_title}` | İlgili konu başlığı. |
+| `{topic_link}` | Konuya dönüş linki. |
+| `{history_count}` | Eski sürüm sayısı. |
+| `{history_rows}` | Eski sürüm satırları HTML. |
 
 ---
 
@@ -476,10 +631,21 @@ Tema özelleştirmesi için `:root` / `.forum-wrapper` altında:
 | Modül | URL | İşlev |
 |-------|-----|--------|
 | `forum_like` | `?controller=ajax&mod=forum_like` | Beğeni / dislike |
-| `forum_quote` | `?controller=ajax&mod=forum_quote` | Alıntı metni |
-| `forum_upload` | `?controller=ajax&mod=forum_upload` | Dosya/resim yükleme |
-| `forum_moderation` | `?controller=ajax&mod=forum_moderation` | Sabitle, kilitle, sil, bump |
-| `forum_reports` | `?controller=ajax&mod=forum_reports` | Şikayet |
+| `forum_quote` | `?controller=ajax&mod=forum_quote` | Tekli / çoklu alıntı metni |
+| `forum_upload` | `?controller=ajax&mod=forum_upload` | Dosya / resim yükleme |
+| `forum_moderation` | `?controller=ajax&mod=forum_moderation` | Sabitle, kilitle, sil, bump, taşı, birleştir, böl, toplu işlem |
+| `forum_reports` | `?controller=ajax&mod=forum_reports` | Şikayet gönder |
+| `forum_approval` | `?controller=ajax&mod=forum_approval` | Onayla / reddet (tek veya toplu) |
+| `forum_trash` | `?controller=ajax&mod=forum_trash` | Çöp kutusu işlemleri |
+| `forum_solve` | `?controller=ajax&mod=forum_solve` | Çözüldü işaretini aç/kapat |
+| `forum_best_answer` | `?controller=ajax&mod=forum_best_answer` | En iyi cevap seç / kaldır |
+| `forum_subscribe` | `?controller=ajax&mod=forum_subscribe` | Konu aboneliği |
+| `forum_cat_subscribe` | `?controller=ajax&mod=forum_cat_subscribe` | Kategori aboneliği |
+| `forum_read` | `?controller=ajax&mod=forum_read` | Konu / kategori okundu işaretle |
+| `forum_rate` | `?controller=ajax&mod=forum_rate` | Konu puanlama (1–5) |
+| `forum_follow` | `?controller=ajax&mod=forum_follow` | Kullanıcı takip et / bırak |
+| `forum_draft` | `?controller=ajax&mod=forum_draft` | Taslak kaydet / yükle / sil |
+| `forum_mention_search` | `?controller=ajax&mod=forum_mention_search` | @mention kullanıcı önerileri |
 | `forum_tools` | `?controller=ajax&mod=forum_tools` | Admin bakım araçları |
 
 Tüm isteklerde `user_hash` / `dle_login_hash` gönderilmelidir.
@@ -501,12 +667,24 @@ Kurallar `forge_forum.xml` içindeki `DLEUrl::AddRule` ile tanımlıdır:
 | Yeni konu | `/forum/new-topic/` |
 | Profil | `/forum/user/{kullanici}/` |
 | Arama | `/forum/search/` |
+| Etiket | `/forum/etiket/{tag}/` |
+| RSS | `/forum/rss/` |
+| RSS (kategori) | `/forum/rss/{kategori}/` |
+| İstatistik | `?do=forum&action=statistics` |
+| Abonelikler | `?do=forum&action=subscriptions` |
+| Çevrimiçi üyeler | `?do=forum&action=online` |
+| Moderasyon paneli | `?do=forum&action=mod` |
+| Düzenleme geçmişi | `?do=forum&action=history&post_id={id}` |
+| Sitemap | `?do=forum&action=sitemap` (`/forum/sitemap.xml`) |
 
 ---
 
 ## 10. Dil dosyası (`forum.lng`)
 
-Şablonlardaki sabit metinleri dil dosyasına taşıyın. PHP tarafında `$lang['forum_...']` anahtarları kullanılır.
+Ön yüz metinleri iki yolla gelir:
+
+1. **PHP mesajları:** `$lang['forum_...']` (msg, AJAX yanıtları, e-posta şablonları).
+2. **Şablon etiketleri:** `forum_set_ui_lang($tpl, $lang)` ile `{forum_ui_*}`, `{forum_stats_*}`, `{forum_search_*}`, `{forum_new_*}` ve `{forum_edit_*}` tag’leri doldurulur.
 
 Desteklenen diller:
 
@@ -515,6 +693,8 @@ Desteklenen diller:
 - `language/Russian/forum.lng`
 
 DLE site dili ne ise o klasördeki `forum.lng` otomatik yüklenir (`engine/modules/forum.php`).
+
+> **Kalan sabit metinler:** `post.tpl`, `profile.tpl`, `mod.tpl`, `online.tpl`, `history.tpl`, `topic_row.tpl`, `subforum_row.tpl` ve `notification_row.tpl` içinde doğrudan Türkçe metinler bulunur. Bunları da taşımak için `forum.lng`’ye anahtar ekleyip `forum_set_ui_lang()` haritasına bağlayın.
 
 ---
 
@@ -530,7 +710,19 @@ DLE site dili ne ise o klasördeki `forum.lng` otomatik yüklenir (`engine/modul
 
 ## 12. Sürüm
 
-- **Eklenti:** Forge Forum v1.1.0  
+- **Eklenti:** Forge Forum **v1.1.0** (17.10.2026)
 - **Kılavuz:** Şablon etiketleri — Forge Forum motoru ile uyumlu
+
+**1.1.0 öne çıkanlar:**
+
+- Ana sayfa istatistik paneli (avatarlı çevrimiçi üyeler, mini sayaçlar, “Tam Liste”)
+- Tüm sayfalarda tek tip `.forum-toolbar`
+- Anket yönetiminde DLE düzeyi eylemler (sonuçlar, düzenle, durdur, temizle, sil)
+- Ön yüzde “Konuyu Düzenle” + konu sahibi / kategori moderatörü izinleri
+- İlk mesaj düzenlenirken anket oylarının korunması
+- Ön yüz metinlerinin TR/EN/RU dil dosyalarına taşınması
+- Kategori kaydetmede `forum_admin_sync_cat_mods` fatal hatası düzeltmesi
+
+Ayrıntılı değişiklik listesi: [update.md](update.md)
 
 Sorular ve güncellemeler için: [forge_forum.xml](forge_forum.xml) ve `engine/modules/forum/actions/` altındaki action dosyalarına bakın.
