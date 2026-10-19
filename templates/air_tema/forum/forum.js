@@ -388,3 +388,60 @@ function forumReloadCaptcha() {
   if (document.readyState !== 'loading') attachAll();
   else document.addEventListener('DOMContentLoaded', attachAll);
 })();
+
+/* Forge Forum — Görsel büyütme (lightbox) */
+(function () {
+  function initForumLightbox() {
+    if (document.getElementById('forum-lightbox')) return;
+
+    var overlay = document.createElement('div');
+    overlay.id = 'forum-lightbox';
+    overlay.className = 'forum-lightbox';
+    overlay.innerHTML = '<button type="button" class="forum-lightbox__close" aria-label="Kapat">&times;</button><img class="forum-lightbox__img" alt="">';
+    document.body.appendChild(overlay);
+
+    var imgEl = overlay.querySelector('.forum-lightbox__img');
+
+    function close() {
+      overlay.classList.remove('is-open');
+      document.body.classList.remove('forum-lightbox-open');
+      imgEl.removeAttribute('src');
+    }
+
+    function open(src, alt) {
+      imgEl.src = src;
+      imgEl.alt = alt || '';
+      overlay.classList.add('is-open');
+      document.body.classList.add('forum-lightbox-open');
+    }
+
+    overlay.addEventListener('click', function (e) {
+      if (e.target === overlay || e.target.classList.contains('forum-lightbox__close')) close();
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape' && overlay.classList.contains('is-open')) close();
+    });
+
+    window.addEventListener('click', function (e) {
+      var img = e.target.closest ? e.target.closest('.forum-post-content img') : null;
+      var link = e.target.closest ? e.target.closest('.forum-post-content a') : null;
+      if (!img && link) img = link.querySelector('img');
+      if (!img) return;
+      if (img.closest('.emoji') || img.classList.contains('emoji')) return;
+      if (!link) link = img.closest('a');
+      var href = link ? (link.getAttribute('href') || '') : '';
+      var isImageLink = href && /\.(jpe?g|png|gif|webp|bmp|avif|svg)(\?|#|$)/i.test(href);
+
+      /* Harici sayfa bağlantısına karışma */
+      if (link && href && !isImageLink) return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      open(isImageLink ? link.href : img.src, img.alt);
+    }, true);
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initForumLightbox);
+  else initForumLightbox();
+})();

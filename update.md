@@ -75,6 +75,7 @@
 - **Editörler arası görsel sızıntısı.** Yeni konu/cevap editörleri `news_id=0` gönderdiği için yükleme modalı kullanıcının tüm `post_id=0` yüklemelerini listeliyordu. Cevap editörü `-konu_id`, yeni konu editörü benzersiz negatif taslak anahtarı kullanıyor; modal listesi `post_id = news_id AND user_id` ile sınırlandı. `engine/ajax/forum_upload.php`, `actions/{topic,new_topic}.php`
 - **Çift yanıt bildirimi.** Konu sahibi hem abone hem yazar olduğunda her yanıt için iki bildirim gidiyordu; abone sorgusunda konu sahibi dışlandı. `engine/modules/forum/actions/reply.php`
 - **Arama sayfası başlığı.** `<title>` içine kaçışmış `noindex` meta etiketi basılıyordu; `$metatags['robots']` kullanımına çevrildi. `engine/modules/forum/actions/search.php`
+- **Görsel büyütme (lightbox).** Forum gönderilerindeki görseller artık tıklanınca tam ekran katmanında açılıyor; harici sayfa bağlantılarına dokunulmuyor. Ek kütüphane gerekmez (`Esc`, arka plan veya × ile kapanır). `templates/{Default,air_tema}/forum/forum.js`, `forum.css`
 ---
 
 ## (10.10.2026)

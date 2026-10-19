@@ -2625,3 +2625,51 @@ textarea.wysiwygeditor {
   color: #ffffff;
   border-bottom: 1px solid var(--forum-bg-header);
 }
+
+/* Forge Forum — Görsel büyütme (lightbox) */
+.forum-post-content img {
+  cursor: zoom-in;
+}
+.forum-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 999999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(8, 15, 25, 0.9);
+  cursor: zoom-out;
+}
+.forum-lightbox.is-open {
+  display: flex;
+}
+.forum-lightbox__img {
+  max-width: 92vw;
+  max-height: 90vh;
+  width: auto;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.55);
+  background: #fff;
+}
+.forum-lightbox__close {
+  position: absolute;
+  top: 14px;
+  right: 18px;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+}
+.forum-lightbox__close:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+body.forum-lightbox-open {
+  overflow: hidden;
+}
