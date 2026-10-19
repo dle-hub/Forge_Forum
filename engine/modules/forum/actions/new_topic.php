@@ -138,18 +138,7 @@ if (isset($_POST["submit_topic"])) {
             require_once ENGINE_DIR .
                 "/classes/htmlpurifier/HTMLPurifier.standalone.php";
         }
-        $purify_config = HTMLPurifier_Config::createDefault();
-        $purify_config->set("Core.Encoding", "UTF-8");
-        $purify_config->set(
-            "HTML.Allowed",
-            "p,b,i,u,s,strong,em,span[style],div[style],br,ul,ol,li,a[href|target|rel],img[src|alt|width|height|style],pre,code,blockquote,h1,h2,h3,h4,h5,h6,hr,table[style],tr,td[style],th[style],sub,sup",
-        );
-        $purify_config->set(
-            "CSS.AllowedProperties",
-            "color,background-color,font-size,font-weight,font-style,text-align,text-decoration,margin,padding,border,width,max-width,height,float",
-        );
-        $purifier = new HTMLPurifier($purify_config);
-        $post_text = $purifier->purify($post_text);
+        $post_text = forum_sanitize_html($post_text);
     } else {
         // BBCode modu - BBCode etiketlerini temizle
         $post_text = strip_tags($post_text);
@@ -397,6 +386,7 @@ if ($forum_cfg["editor_enabled"]) {
     include_once DLEPlugins::Check(ENGINE_DIR . "/modules/forum/editor_helpers.php");
     forum_register_editor_assets("tinymce", $js_array, $css_array, $lang);
     $f_editor_id = "forum-editor";
+    $f_editor_news_id = -intval(substr(md5(uniqid('', true)), 0, 9));
     $f_editor_height = 350;
     $f_editor_mode = "full";
     $f_editor_context = "topic";

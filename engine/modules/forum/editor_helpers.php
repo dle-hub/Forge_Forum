@@ -137,6 +137,18 @@ if (!function_exists("forum_sanitize_html")) {
             );
             // Disk tabanlı tanım önbelleğini devre dışı bırak (yazılabilir dizin gerektirmez)
             $config->set("Cache.DefinitionImpl", null);
+            // DLE'nin HTMLPurifier derlemesinde doctype modülleri yok; img'yi elle tanımla.
+            $config->set("HTML.DefinitionID", "forum-html");
+            $config->set("HTML.DefinitionRev", 2);
+            if ($def = $config->maybeGetRawHTMLDefinition()) {
+                $def->addElement("img", "Inline", "Empty", "Common", [
+                    "src*" => "URI",
+                    "alt" => "Text",
+                    "width" => "Pixels",
+                    "height" => "Pixels",
+                    "style" => "Text",
+                ]);
+            }
             $purifier = new HTMLPurifier($config);
         }
 

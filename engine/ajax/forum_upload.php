@@ -313,11 +313,12 @@ if (empty($subaction)) {
     $uploaded_list = [];
     $uid = intval($member_id['user_id']);
 
-    if ($news_id > 0) {
-        $db->query("SELECT * FROM " . PREFIX . "_forum_uploads WHERE post_id = '{$news_id}' ORDER BY id DESC");
+    if ($news_id != 0) {
+        $db->query("SELECT * FROM " . PREFIX . "_forum_uploads WHERE post_id = '{$news_id}' AND user_id = '{$uid}' ORDER BY id DESC");
     } else {
         $two_hours_ago = date('Y-m-d H:i:s', time() - 7200);
-        $db->query("SELECT * FROM " . PREFIX . "_forum_uploads WHERE user_id = '{$uid}' AND post_id = 0 AND date >= '{$two_hours_ago}' ORDER BY id DESC");
+        // Sahipsiz (0) yuklemeler baska editorlere sizmasin
+        $db->query("SELECT * FROM " . PREFIX . "_forum_uploads WHERE 1=0");
     }
 
     $images_count = 0;

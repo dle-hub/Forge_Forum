@@ -65,7 +65,16 @@
 
 - **`get_row()` / `INSERT` çakışması.** Yanıt sonrası abone bildirim döngüsünde, döngü gövdesindeki `INSERT` DLE'nin `$db->query_id` değerini ezip bir sonraki `get_row()` çağrısını ölümcül hataya düşürüyordu (birden fazla abone olduğunda). Satırlar artık önce toplanıyor, sonra yazılıyor. `engine/modules/forum/actions/reply.php`
 - **`follow_topic` bildirimi boş görünüyordu.** Takip edilen üye yeni konu açınca oluşan bildirimler, bildirim sayfasında tip bloğu olmadığı için boş metinle render ediliyordu; `follow_topic` ve yeni `cat_topic` tipleri için metin/ikon blokları eklendi. `engine/modules/forum/actions/notifications.php`, `templates/{skin}/forum/notification_row.tpl`
-
+
+### Yeniden paket — editör, yükleme ve BBCode düzeltmeleri (19.10.2026)
+
+- **TinyMCE görsel yüklemesi.** `forum_upload.class.php` dosya alanını tespit ediyor ancak `$this->field_name` değişkenine atamıyordu; `file` alanıyla gelen yüklemeler "No file was uploaded" ile reddediliyordu. `engine/classes/uploads/forum_upload.class.php`
+- **Görsellerin kayıtta silinmesi.** DLE'nin HTMLPurifier derlemesinde doctype modülleri bulunmadığından `img` elementi tanımsızdı ve sanitizer görselleri siliyordu. `forum_sanitize_html()` içinde `img` (src/alt/width/height/style) elle tanımlandı; `new_topic` ve `reply` kopya purifier blokları merkezi fonksiyona bağlandı. `engine/modules/forum/editor_helpers.php`, `actions/{new_topic,reply}.php`
+- **Editörde çift HTML kaçışı.** `forum_prepare_editor_content()` zaten kaçış yaptığı halde `edit.php` bir kez daha `htmlspecialchars` uyguluyordu; içerik `&lt;p&gt;` olarak kaydediliyordu. Fazla kaçış kaldırıldı. `engine/modules/forum/actions/edit.php`
+- **BBCode çevrilmiyordu.** DLE'nin `BB_Parse()` sürümü `[b]`, `[i]`, `[u]`, `[s]`, `[url]` gibi basit etiketleri işlemiyor; eklentinin hafif parser'ı yalnızca `BB_Parse` yoksa çalışıyordu. Parser artık her modda önce çalışıyor; `[s]` çıktısı `<s>` olarak düzeltildi (imza dahil). `engine/modules/forum/actions/topic.php`
+- **Editörler arası görsel sızıntısı.** Yeni konu/cevap editörleri `news_id=0` gönderdiği için yükleme modalı kullanıcının tüm `post_id=0` yüklemelerini listeliyordu. Cevap editörü `-konu_id`, yeni konu editörü benzersiz negatif taslak anahtarı kullanıyor; modal listesi `post_id = news_id AND user_id` ile sınırlandı. `engine/ajax/forum_upload.php`, `actions/{topic,new_topic}.php`
+- **Çift yanıt bildirimi.** Konu sahibi hem abone hem yazar olduğunda her yanıt için iki bildirim gidiyordu; abone sorgusunda konu sahibi dışlandı. `engine/modules/forum/actions/reply.php`
+- **Arama sayfası başlığı.** `<title>` içine kaçışmış `noindex` meta etiketi basılıyordu; `$metatags['robots']` kullanımına çevrildi. `engine/modules/forum/actions/search.php`
 ---
 
 ## (10.10.2026)

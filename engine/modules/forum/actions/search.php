@@ -35,7 +35,7 @@ $total   = 0;
 // -------------------------------------------------
 $metatags['title'] = sprintf($lang['forum_search_title'], $forum_title);
 $metatags['description'] = $lang['forum_search_desc'];
-$metatags['header_title'] = '<meta name="robots" content="noindex, nofollow">';
+$metatags['robots'] = 'noindex, nofollow';
 $forum_speedbar[''] = $lang['forum_search_breadcrumb'];
 
 // -------------------------------------------------

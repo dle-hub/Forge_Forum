@@ -299,7 +299,7 @@ if ($forum_cfg["editor_enabled"]) {
     include_once DLEPlugins::Check(ENGINE_DIR . "/editor/forum.php");
     
     // textarea'ya gomulen HTML, </textarea> breakout XSS'ine karsi escape edilmeli
-    $post_val = htmlspecialchars(forum_prepare_editor_content($post["text"]), ENT_QUOTES, "UTF-8");
+    $post_val = forum_prepare_editor_content($post["text"]);
     
     $wysiwyg = str_replace('></textarea>', '>' . $post_val . '</textarea>', $wysiwyg);
     $tpl->set("{forum_editor}", $wysiwyg);

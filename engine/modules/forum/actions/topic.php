@@ -362,28 +362,30 @@ foreach ($posts as $idx => $p) {
     $p_text = forum_word_filter($p["text"]);
     
     // 1. BBCode + HTML birlikte isle
-    // BB_Parse(true) = wysiwyg modu: HTML'i escape ETMEZ, BBCode'u HTML'e cevirir
-    // Bu sekilde hem TinyMCE HTML icerigi hem [quote=...] gibi BBCode dogru calisir
-    if (method_exists($parse, 'BB_Parse')) {
-        $p_text = $parse->BB_Parse($p_text, true);
-    } else {
-        // Fallback: temel BBCode parser
-        $p_text = preg_replace('/\[b\](.*?)\[\/b\]/is', '<strong>$1</strong>', $p_text);
-        $p_text = preg_replace('/\[i\](.*?)\[\/i\]/is', '<em>$1</em>', $p_text);
-        $p_text = preg_replace('/\[u\](.*?)\[\/u\]/is', '<span style="text-decoration:underline;">$1</span>', $p_text);
-        $p_text = preg_replace('/\[s\](.*?)\[\/s\]/is', '<del>$1</del>', $p_text);
-        $p_text = preg_replace('/\[quote=([^\]]+)\](.*?)\[\/quote\]/is', '<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2 text-gray-600 bg-gray-50 p-3 rounded"><strong>$1:</strong> $2</blockquote>', $p_text);
-        $p_text = preg_replace('/\[quote\](.*?)\[\/quote\]/is', '<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2 text-gray-600 bg-gray-50 p-3 rounded">$1</blockquote>', $p_text);
-        $p_text = preg_replace('/\[url=(.*?)\](.*?)\[\/url\]/is', '<a href="$1" target="_blank" rel="nofollow">$2</a>', $p_text);
-        $p_text = preg_replace('/\[url\](.*?)\[\/url\]/is', '<a href="$1" target="_blank" rel="nofollow">$1</a>', $p_text);
-        $p_text = preg_replace('/\[img\](.*?)\[\/img\]/is', '<img src="$1" class="max-w-full rounded my-2" alt="">', $p_text);
-        $p_text = preg_replace('/\[thumb\](.*?)\[\/thumb\]/is', '<img src="$1" class="max-w-full rounded my-2" alt="">', $p_text);
-        $p_text = preg_replace('/\[code\](.*?)\[\/code\]/is', '<pre class="bg-gray-50 border rounded p-3 text-xs overflow-x-auto my-2 font-mono">$1</pre>', $p_text);
-        if (!preg_match('/<[a-z]/i', $p_text)) {
-            $p_text = nl2br($p_text);
-        }
+    // DLE'nin BB_Parse() surumu basit etiketleri ([b], [i], [url] ...) cevirmiyor;
+    // bu yuzden hafif parser her modda once calisir. HTML icerik etkilenmez.
+    $has_html_tags = (bool) preg_match('/<[a-z][^>]*>/i', $p_text);
+
+    $p_text = preg_replace('/\[b\](.*?)\[\/b\]/is', '<strong>$1</strong>', $p_text);
+    $p_text = preg_replace('/\[i\](.*?)\[\/i\]/is', '<em>$1</em>', $p_text);
+    $p_text = preg_replace('/\[u\](.*?)\[\/u\]/is', '<span style="text-decoration:underline;">$1</span>', $p_text);
+    $p_text = preg_replace('/\[s\](.*?)\[\/s\]/is', '<s>$1</s>', $p_text);
+    $p_text = preg_replace('/\[quote=([^\]]+)\](.*?)\[\/quote\]/is', '<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2 text-gray-600 bg-gray-50 p-3 rounded"><strong>$1:</strong> $2</blockquote>', $p_text);
+    $p_text = preg_replace('/\[quote\](.*?)\[\/quote\]/is', '<blockquote class="border-l-4 border-blue-500 pl-4 italic my-2 text-gray-600 bg-gray-50 p-3 rounded">$1</blockquote>', $p_text);
+    $p_text = preg_replace('/\[url=(.*?)\](.*?)\[\/url\]/is', '<a href="$1" target="_blank" rel="nofollow">$2</a>', $p_text);
+    $p_text = preg_replace('/\[url\](.*?)\[\/url\]/is', '<a href="$1" target="_blank" rel="nofollow">$1</a>', $p_text);
+    $p_text = preg_replace('/\[img\](.*?)\[\/img\]/is', '<img src="$1" class="max-w-full rounded my-2" alt="">', $p_text);
+    $p_text = preg_replace('/\[thumb\](.*?)\[\/thumb\]/is', '<img src="$1" class="max-w-full rounded my-2" alt="">', $p_text);
+    $p_text = preg_replace('/\[code\](.*?)\[\/code\]/is', '<pre class="bg-gray-50 border rounded p-3 text-xs overflow-x-auto my-2 font-mono">$1</pre>', $p_text);
+
+    if (!$has_html_tags) {
+        $p_text = nl2br($p_text);
     }
 
+    // BB_Parse(true) = wysiwyg modu: HTML'i escape ETMEZ, kalan BBCode'u isler
+    if (method_exists($parse, 'BB_Parse')) {
+        $p_text = $parse->BB_Parse($p_text, true);
+    }
     // 2. BB_Parse "slashed" cikti uretir (harici linklere addslashes uygular);
     //    gosterim icin bir kez stripslashes, ardindan whitelist tabanli XSS temizligi.
     $p_text = forum_sanitize_html(stripslashes($p_text));
@@ -504,7 +506,7 @@ foreach ($posts as $idx => $p) {
             $p_sig_raw = preg_replace('/\[b\](.*?)\[\/b\]/is', '<b>$1</b>', $p_sig_raw);
             $p_sig_raw = preg_replace('/\[i\](.*?)\[\/i\]/is', '<i>$1</i>', $p_sig_raw);
             $p_sig_raw = preg_replace('/\[u\](.*?)\[\/u\]/is', '<u>$1</u>', $p_sig_raw);
-            $p_sig_raw = preg_replace('/\[s\](.*?)\[\/s\]/is', '<del>$1</del>', $p_sig_raw);
+            $p_sig_raw = preg_replace('/\[s\](.*?)\[\/s\]/is', '<s>$1</s>', $p_sig_raw);
             $p_sig_raw = preg_replace('/\[url=(.*?)\](.*?)\[\/url\]/is', '<a href="$1" rel="nofollow">$2</a>', $p_sig_raw);
             $p_sig_raw = preg_replace('/\[url\](.*?)\[\/url\]/is', '<a href="$1" rel="nofollow">$1</a>', $p_sig_raw);
             $p_sig_raw = preg_replace('/\[img\](.*?)\[\/img\]/is', '<img src="$1" alt="">', $p_sig_raw);
@@ -875,6 +877,7 @@ if (!$allow_post_reply) {
     $editor_type = forum_get_editor_type($forum_cfg, "reply");
     forum_register_editor_assets($editor_type, $js_array, $css_array, $lang);
     $f_editor_id = "forum-reply-textarea";
+    $f_editor_news_id = -intval($tid);
     $f_editor_height = 250;
     $f_editor_mode = "reply";
     $f_editor_context = "reply";

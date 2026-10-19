@@ -147,18 +147,7 @@ if (isset($_POST["submit_reply"])) {
             require_once ENGINE_DIR .
                 "/classes/htmlpurifier/HTMLPurifier.standalone.php";
         }
-        $purify_config = HTMLPurifier_Config::createDefault();
-        $purify_config->set("Core.Encoding", "UTF-8");
-        $purify_config->set(
-            "HTML.Allowed",
-            "p,b,i,u,s,strong,em,span[style],div[style],br,ul,ol,li,a[href|target|rel],img[src|alt|width|height|style],pre,code,blockquote,hr,sub,sup",
-        );
-        $purify_config->set(
-            "CSS.AllowedProperties",
-            "color,background-color,font-size,font-weight,font-style,text-align,text-decoration,margin,padding,border,width,max-width,height,float",
-        );
-        $purifier = new HTMLPurifier($purify_config);
-        $post_text = $purifier->purify($post_text);
+        $post_text = forum_sanitize_html($post_text);
     } else {
         $post_text = strip_tags($post_text);
     }
@@ -271,11 +260,14 @@ if (isset($_POST["submit_reply"])) {
         // Not: satırlar önce toplanır; döngü içinde INSERT yapmak DLE'nin
         // $db->query_id değerini ezip sonraki get_row() çağrısını bozar.
         $sub_rows = [];
+        // Konu sahibi 6. adımda ayrıca bildirilir; abone listesinde tekrar
+        // gönderilmesin diye burada dışlanır (çift bildirim önlenir).
+        $author_uid = intval($topic["user_id"]);
         $db->query(
             "SELECT user_id FROM " .
                 PREFIX .
                 "_forum_subs
-            WHERE topic_id = '{$tid}' AND user_id != '{$uid}'",
+            WHERE topic_id = '{$tid}' AND user_id != '{$uid}' AND user_id != '{$author_uid}'",
         );
         while ($s = $db->get_row()) {
             $sub_rows[] = intval($s["user_id"]);

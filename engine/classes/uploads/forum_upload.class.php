@@ -374,6 +374,8 @@ class ForumUploadFileViaForm {
 			$field_name = 'file';
 		}
 
+		$this->field_name = $field_name;
+
 		$_FILES[$field_name]['name'] = isset($_FILES[$field_name]['name']) ? $_FILES[$field_name]['name'] : '';
 
 		$this->chunk = isset($_REQUEST['chunk']) ? intval($_REQUEST['chunk']) : 0;
