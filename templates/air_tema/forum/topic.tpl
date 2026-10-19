@@ -6,10 +6,10 @@
     <div class="forum-toolbar forum-toolbar--topic">
         <div class="forum-toolbar__head">
             <i class="fa fa-comments" aria-hidden="true"></i>
-            <span class="forum-toolbar__topic">Konu: {topic_title}</span>
+            <span class="forum-toolbar__topic">{forum_ui_topic_label} {topic_title}</span>
             [topic-pinned]<span class="badge">{forum_ui_pinned_badge}</span>[/topic-pinned]
             [topic-locked]<span class="badge">{forum_ui_locked_badge}</span>[/topic-locked]
-            [topic-solved]<span class="badge badge--solved">ÇÖZÜLDÜ</span>[/topic-solved]
+            [topic-solved]<span class="badge badge--solved">{forum_ui_solved_badge}</span>[/topic-solved]
         </div>
         <div class="forum-toolbar__bar">
             <div class="forum-toolbar__links">
@@ -97,7 +97,7 @@
     <!-- Pagination -->
     {pagination}
 
-    <!-- Benzer Konular + Kim Görüntülüyor -->
+    <!-- {forum_ui_similar} + Kim Görüntülüyor -->
     [has-similar]
     <section class="forum-category-block mt-4">
         <header class="forum-cat-bar forum-cat-header">
@@ -290,7 +290,7 @@ function forumInsertUploadedContent(res) {
 
     var content = res.is_image
         ? '<img src="' + url + '" alt="" />'
-        : '<a href="' + url + '">' + (res.filename || 'dosya') + '</a>';
+        : '<a href="' + url + '">' + (res.filename || '{forum_ui_file}') + '</a>';
 
     if (typeof tinymce !== 'undefined') {
         var editor = tinymce.get('forum-reply-textarea');
@@ -477,7 +477,7 @@ function executeModAction(action, topicId) {
 
 function forumReportPost(postId) {
     if (typeof DLEprompt === 'undefined') {
-        var reason = prompt('Şikayet Nedeniniz:');
+        var reason = prompt('{forum_ui_report_reason}');
         if (reason && reason.trim() !== '') {
             submitForumReport(postId, reason);
         }

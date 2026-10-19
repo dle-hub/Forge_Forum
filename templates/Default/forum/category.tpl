@@ -33,9 +33,9 @@
             <span class="forum-cat-toggle"><i class="fa fa-minus"></i></span>
         </div>
         <div class="forum-sub-header">
-            <div class="forum-col-forum">Konu Başlığı</div>
-            <div class="forum-col-stats">İstatistikler</div>
-            <div class="forum-col-lastpost">Son İleti</div>
+            <div class="forum-col-forum">{forum_ui_topic_title_col}</div>
+            <div class="forum-col-stats">{forum_ui_statistics}</div>
+            <div class="forum-col-lastpost">{forum_ui_last_post_col}</div>
         </div>
         <div class="forum-cat-rows">
             {topic_rows}

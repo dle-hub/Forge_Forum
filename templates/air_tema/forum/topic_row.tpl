@@ -11,7 +11,7 @@
     <div class="forum-node__info">
         <div class="forum-node__badges">
             [t-has-prefix]<span class="badge" style="background:{t_prefix_color};border-color:{t_prefix_color};color:#fff"><i class="fa {t_prefix_icon}" aria-hidden="true"></i> {t_prefix_name}</span>[/t-has-prefix]
-            [t-unread]<span class="badge badge--new">Yeni</span>[/t-unread]
+            [t-unread]<span class="badge badge--new">{forum_ui_new_badge}</span>[/t-unread]
         </div>
         <h3 class="forum-node__title" style="{t_title_style}"><a href="{t_url}">{t_title}</a></h3>
         <div class="forum-node__meta">
@@ -21,15 +21,15 @@
         </div>
         [t-first-unread]
         <div class="forum-node__firstunread">
-            <a href="{t_first_unread_url}" class="read-link"><i class="fa fa-arrow-circle-right" aria-hidden="true"></i> İlk okunmamışa git</a>
+            <a href="{t_first_unread_url}" class="read-link"><i class="fa fa-arrow-circle-right" aria-hidden="true"></i> {forum_ui_first_unread}</a>
         </div>
         [/t-first-unread]
     </div>
 
     <!-- İstatistik -->
     <div class="forum-node__stats">
-        <span class="forum-node__stat"><b>{t_replies}</b> cevap</span>
-        <span class="forum-node__stat"><b>{t_views}</b> görüntüleme</span>
+        <span class="forum-node__stat"><b>{t_replies}</b> {forum_ui_replies_lc}</span>
+        <span class="forum-node__stat"><b>{t_views}</b> {forum_ui_views_lc}</span>
     </div>
 
     <!-- Son ileti -->

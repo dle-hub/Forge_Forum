@@ -69,6 +69,7 @@ $current_text = htmlspecialchars(strip_tags(stripslashes((string) $post["text"])
 $topic_link = forum_topic_post_url(intval($post["topic_id"]), $post["topic_alt"] ?? "", $post_id);
 
 $tpl->load_template("forum/history.tpl");
+forum_set_ui_lang($tpl, $lang);
 $tpl->set("{forum_breadcrumb}", "{forum_breadcrumb}");
 $tpl->set("{history_title}", htmlspecialchars($lang['forum_history_title'] ?? "Düzenleme Geçmişi", ENT_QUOTES, "UTF-8"));
 $tpl->set("{topic_title}", htmlspecialchars(stripslashes((string) $post["topic_title"]), ENT_QUOTES, "UTF-8"));

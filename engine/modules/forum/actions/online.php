@@ -53,6 +53,7 @@ while ($o = $db->get_row()) {
 }
 
 $tpl->load_template("forum/online.tpl");
+forum_set_ui_lang($tpl, $lang);
 $tpl->set("{forum_breadcrumb}", "{forum_breadcrumb}");
 $tpl->set("{online_title}", htmlspecialchars($lang['forum_online_title'] ?? "Kimler Çevrimiçi", ENT_QUOTES, "UTF-8"));
 $tpl->set("{online_count}", $count);

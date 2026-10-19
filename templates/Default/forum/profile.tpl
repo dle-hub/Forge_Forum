@@ -53,7 +53,7 @@
                        style="display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:bold; padding:6px 12px; border-radius:3px; border:1px solid var(--forum-border-color); background:linear-gradient(to bottom,#fff,#f3f4f6); color:var(--forum-text-primary); text-decoration:none; cursor:pointer; transition:all 0.15s;"
                        onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#2563eb';"
                        onmouseout="this.style.borderColor='var(--forum-border-color)'; this.style.color='var(--forum-text-primary)';">
-                        <i class="fa fa-comment" style="color:#6366f1;"></i> Mesaj Gönder
+                        <i class="fa fa-comment" style="color:#6366f1;"></i> {forum_ui_send_message}
                     </a>
                     [/has-pm]
                     [has-email]
@@ -61,14 +61,14 @@
                        style="display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:bold; padding:6px 12px; border-radius:3px; border:1px solid var(--forum-border-color); background:linear-gradient(to bottom,#fff,#f3f4f6); color:var(--forum-text-primary); text-decoration:none; transition:all 0.15s;"
                        onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#2563eb';"
                        onmouseout="this.style.borderColor='var(--forum-border-color)'; this.style.color='var(--forum-text-primary)';">
-                        <i class="fa fa-envelope-o" style="color:#0891b2;"></i> E-Posta
+                        <i class="fa fa-envelope-o" style="color:#0891b2;"></i> {forum_ui_email}
                     </a>
                     [/has-email]
                     <a href="{http_home_url}index.php?do=forum&action=search&q={user_name}&in=posts"
                        style="display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:bold; padding:6px 12px; border-radius:3px; border:1px solid var(--forum-border-color); background:linear-gradient(to bottom,#fff,#f3f4f6); color:var(--forum-text-primary); text-decoration:none; transition:all 0.15s;"
                        onmouseover="this.style.borderColor='#3b82f6'; this.style.color='#2563eb';"
                        onmouseout="this.style.borderColor='var(--forum-border-color)'; this.style.color='var(--forum-text-primary)';">
-                        <i class="fa fa-search" style="color:#059669;"></i> Gönderileri Bul
+                        <i class="fa fa-search" style="color:#059669;"></i> {forum_ui_find_posts_btn}
                     </a>
                     [can-follow]
                     <button type="button" id="forum-follow-btn" data-active="{follow_active}" onclick="forumToggleFollow({user_id}); return false;"
@@ -78,8 +78,8 @@
                     [/can-follow]
                 </div>
                 <div style="padding-top:8px; display:flex; gap:14px; font-size:11px; font-weight:600;">
-                    <span><i class="fa fa-users" style="color:#2563eb"></i> <b id="forum-followers">{followers}</b> Takipçi</span>
-                    <span><i class="fa fa-user-plus" style="color:#2563eb"></i> <b>{following}</b> Takip</span>
+                    <span><i class="fa fa-users" style="color:#2563eb"></i> <b id="forum-followers">{followers}</b> {forum_ui_followers}</span>
+                    <span><i class="fa fa-user-plus" style="color:#2563eb"></i> <b>{following}</b> {forum_ui_following}</span>
                 </div>
             </div>
         </div>
@@ -88,22 +88,22 @@
         <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin-bottom:1.25rem;">
 
             <div style="background:var(--forum-bg-card); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-md); padding:0.9rem 1rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.04); border-top:3px solid #f59e0b;">
-                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-trophy" style="color:#f59e0b; margin-right:3px;"></i>Puan</div>
+                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-trophy" style="color:#f59e0b; margin-right:3px;"></i>{forum_ui_points}</div>
                 <div style="font-size:1.6rem; font-weight:900; color:#d97706; line-height:1;">{points}</div>
             </div>
 
             <div style="background:var(--forum-bg-card); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-md); padding:0.9rem 1rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.04); border-top:3px solid #3b82f6;">
-                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-folder-o" style="color:#3b82f6; margin-right:3px;"></i>Konu</div>
+                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-folder-o" style="color:#3b82f6; margin-right:3px;"></i>{forum_ui_topics}</div>
                 <div style="font-size:1.6rem; font-weight:900; color:#2563eb; line-height:1;">{topic_count}</div>
             </div>
 
             <div style="background:var(--forum-bg-card); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-md); padding:0.9rem 1rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.04); border-top:3px solid #6366f1;">
-                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-comments-o" style="color:#6366f1; margin-right:3px;"></i>Mesaj</div>
+                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-comments-o" style="color:#6366f1; margin-right:3px;"></i>{forum_ui_posts}</div>
                 <div style="font-size:1.6rem; font-weight:900; color:#4f46e5; line-height:1;">{post_count}</div>
             </div>
 
             <div style="background:var(--forum-bg-card); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-md); padding:0.9rem 1rem; text-align:center; box-shadow:0 1px 4px rgba(0,0,0,0.04); border-top:3px solid #10b981;">
-                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-calendar" style="color:#10b981; margin-right:3px;"></i>Kayıt</div>
+                <div style="font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:0.07em; color:var(--forum-text-muted); margin-bottom:6px;"><i class="fa fa-calendar" style="color:#10b981; margin-right:3px;"></i>{forum_ui_joined}</div>
                 <div style="font-size:11px; font-weight:700; color:#059669; line-height:1.3; padding-top:4px;">{reg_date}</div>
             </div>
         </div>
@@ -111,7 +111,7 @@
         <!-- SON AKTİVİTE BANDI -->
         <div style="background:var(--forum-bg-subheader); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-md); padding:0.6rem 1.2rem; margin-bottom:1.25rem; font-size:11px; color:var(--forum-text-secondary); display:flex; align-items:center; gap:8px;">
             <i class="fa fa-clock-o" style="color:var(--forum-text-muted);"></i>
-            Son görülme: <strong style="color:var(--forum-text-primary);">{last_date}</strong>
+            {forum_ui_last_seen}: <strong style="color:var(--forum-text-primary);">{last_date}</strong>
         </div>
 
         <!-- İKİ KOLON GRID: SON KONULAR / SON MESAJLAR -->
@@ -121,18 +121,18 @@
             <div style="background:var(--forum-bg-card); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-lg); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                 <div style="background:var(--forum-bg-subheader); border-bottom:1px solid var(--forum-border-color); padding:0.65rem 1rem; display:flex; align-items:center; gap:7px;">
                     <i class="fa fa-file-text-o" style="color:#3b82f6; font-size:13px;"></i>
-                    <span style="font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; color:var(--forum-text-primary);">Son Açılan Konular</span>
+                    <span style="font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; color:var(--forum-text-primary);">{forum_ui_recent_topics}</span>
                 </div>
                 <div style="padding:0.5rem 0;">
                     {recent_topics}
                 </div>
             </div>
 
-            <!-- Son Mesajlar -->
+            <!-- {forum_ui_recent_posts} -->
             <div style="background:var(--forum-bg-card); border:1px solid var(--forum-border-color); border-radius:var(--forum-radius-lg); overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
                 <div style="background:var(--forum-bg-subheader); border-bottom:1px solid var(--forum-border-color); padding:0.65rem 1rem; display:flex; align-items:center; gap:7px;">
                     <i class="fa fa-comments-o" style="color:#6366f1; font-size:13px;"></i>
-                    <span style="font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; color:var(--forum-text-primary);">Son Mesajlar</span>
+                    <span style="font-size:11px; font-weight:bold; text-transform:uppercase; letter-spacing:0.05em; color:var(--forum-text-primary);">{forum_ui_recent_posts}</span>
                 </div>
                 <div style="padding:0.5rem 0;">
                     {recent_posts}
@@ -158,6 +158,6 @@ function forumToggleFollow(targetId) {
             var btn = document.getElementById('forum-follow-btn');
             if (btn) btn.setAttribute('data-active', r.following ? '1' : '0');
         } else if (r && r.message) { alert(r.message); }
-    }, 'json').fail(function () { alert('Bağlantı hatası.'); });
+    }, 'json').fail(function () { alert('{forum_ui_js_connection}'); });
 }
 </script>

@@ -125,6 +125,7 @@ while ($rep = $db->get_row()) {
 // 4. ŞABLON
 // -------------------------------------------------
 $tpl->load_template("forum/mod.tpl");
+forum_set_ui_lang($tpl, $lang);
 $tpl->set("{forum_breadcrumb}", "{forum_breadcrumb}");
 $tpl->set("{mod_title}", htmlspecialchars($lang['forum_mod_panel'] ?? "Moderasyon", ENT_QUOTES, "UTF-8"));
 $tpl->set("{pending_count}", $pending_count);

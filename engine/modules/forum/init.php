@@ -13,14 +13,11 @@ if (!defined("DATALIFEENGINE")) {
 }
 
 // Veritabanı Otomatik Geçiş (Auto-Migration)
-// Şema kontrolü yalnızca bir kez çalışır; sonraki isteklerde kilit dosyası sayesinde atlanır.
-$forum_schema_lock = ENGINE_DIR . '/cache/system/forum_schema_v1.lock';
-if (!file_exists($forum_schema_lock)) {
-    $db->query("SHOW COLUMNS FROM " . PREFIX . "_forum_topics LIKE 'prefix_id'");
-    if (!$db->num_rows()) {
-        $db->query("ALTER TABLE " . PREFIX . "_forum_topics ADD prefix_id INT(11) DEFAULT 0 AFTER cat_id");
-    }
-    @file_put_contents($forum_schema_lock, (string) time());
+// prefix_id kolonu her forum isteğinde doğrulanır; eski bir kilit dosyasının
+// kalması kurulum sonrası ALTER işleminin atlanmasına yol açmamalıdır.
+$db->query("SHOW COLUMNS FROM " . PREFIX . "_forum_topics LIKE 'prefix_id'");
+if (!$db->num_rows()) {
+    $db->query("ALTER TABLE " . PREFIX . "_forum_topics ADD prefix_id INT(11) DEFAULT 0 AFTER cat_id");
 }
 
 // Ayarlari veritabanindan cek
@@ -74,6 +71,9 @@ $forum_cfg = array_merge(
     $forum_cfg,
 );
 
+include_once DLEPlugins::Check(
+    ENGINE_DIR . "/modules/forum/permission_helpers.php",
+);
 include_once DLEPlugins::Check(
     ENGINE_DIR . "/modules/forum/rank_helpers.php",
 );
@@ -390,6 +390,50 @@ function forum_parse_mentions($text, $topic_id, $post_id, $from_uid) {
 $_REQUEST["topic_id"] = $_GET["topic_id"] = $f_topic_id;
 $_REQUEST["cat"] = $_GET["cat"] = $f_cat;
 
+// -------------------------------------------------
+// ŞABLON SETİ FALLBACK + VARLIK YÜKLEME
+// Aktif temada forum/ klasörü yoksa (ör. Smart) Default seti kullanılır.
+// forum.css / forum.js sadece main.tpl'de elle dahil edilmemişse eklenir.
+// -------------------------------------------------
+$forum_tpl_fallback_dir = "";
+$forum_asset_skin = isset($config["skin"]) && $config["skin"] !== "" ? $config["skin"] : "Default";
+$forum_tpl_root = rtrim($tpl->dir, "/\\");
+
+if (!is_dir($forum_tpl_root . "/forum")) {
+    $forum_default_tpl_root = ROOT_DIR . "/templates/Default";
+    if (is_dir($forum_default_tpl_root . "/forum")) {
+        $forum_tpl_fallback_dir = $tpl->dir;
+        $tpl->dir = $forum_default_tpl_root;
+        $forum_asset_skin = "Default";
+    }
+}
+
+$forum_asset_base = "templates/" . $forum_asset_skin . "/forum/";
+$forum_main_tpl = ROOT_DIR . "/templates/" . $forum_asset_skin . "/main.tpl";
+$forum_main_src = is_file($forum_main_tpl) ? (string) file_get_contents($forum_main_tpl) : "";
+$forum_theme_main_src = "";
+if ($forum_tpl_fallback_dir !== "") {
+    $forum_theme_main_tpl = rtrim($forum_tpl_fallback_dir, "/\\") . "/main.tpl";
+    $forum_theme_main_src = is_file($forum_theme_main_tpl) ? (string) file_get_contents($forum_theme_main_tpl) : "";
+}
+
+if (is_file(ROOT_DIR . "/" . $forum_asset_base . "forum.css") && stripos($forum_main_src, "forum/forum.css") === false) {
+    $tpl->css_array[] = $forum_asset_base . "forum.css";
+}
+if (is_file(ROOT_DIR . "/" . $forum_asset_base . "forum.js") && stripos($forum_main_src, "forum/forum.js") === false) {
+    $tpl->js_array[] = $forum_asset_base . "forum.js";
+}
+
+// Font Awesome 4.7 — eklenti şablonları fa-* sınıflarını kullanır.
+// Bazı temalar (ör. Air) Font Awesome yüklemediği için forum sayfalarında garanti altına alınır.
+if (
+    is_file(ROOT_DIR . "/public/fonts/fontawesome/styles.min.css") &&
+    stripos($forum_main_src, "fontawesome") === false &&
+    stripos($forum_theme_main_src, "fontawesome") === false
+) {
+    $tpl->css_array[] = "public/fonts/fontawesome/styles.min.css";
+}
+
 $action_file = ENGINE_DIR . "/modules/forum/actions/" . $f_action . ".php";
 
 if (file_exists($action_file)) {
@@ -398,6 +442,10 @@ if (file_exists($action_file)) {
     include DLEPlugins::Check(ENGINE_DIR . "/modules/forum/actions/main.php");
 } else {
     die($lang['forum_err_main_missing']);
+}
+
+if ($forum_tpl_fallback_dir !== "") {
+    $tpl->dir = $forum_tpl_fallback_dir;
 }
 
 // Global olarak derlenen şablonlarda üyelik / bildirim etiketlerini post-process et

@@ -32,7 +32,7 @@
                 </div>
                 [/can-move-topic]
 
-                <!-- Konu Başlığı & Önek -->
+                <!-- {forum_ui_topic_title_col} & Önek -->
                 <div>
                     <label class="form-label">
                         <i class="fa fa-tag text-blue-500"></i> {forum_new_title_label}

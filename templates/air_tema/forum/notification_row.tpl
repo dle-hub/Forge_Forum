@@ -10,18 +10,18 @@
     <div class="forum-node__info">
         <div class="forum-node__text">
             [notif-unread]<span class="forum-unread-dot" aria-hidden="true"></span>[/notif-unread]
-            [type-reply]<strong>{sender}</strong>, <a href="{notif_url}">{topic_title}</a> konusuna cevap yazdı.[/type-reply]
-            [type-like]<strong>{sender}</strong>, <a href="{notif_url}">{topic_title}</a> konusundaki mesajınızı beğendi.[/type-like]
-            [type-mention]<strong>{sender}</strong>, <a href="{notif_url}">{topic_title}</a> konusunda sizden bahsetti.[/type-mention]
-            [type-follow_topic]<span class="forum-node__text">Takip ettiğiniz <strong>{sender}</strong> yeni bir konu açtı: <a href="{notif_url}">{topic_title}</a></span>[/type-follow_topic]
-            [type-cat_topic]<span class="forum-node__text"><strong>{sender}</strong>, abone olduğunuz kategoride yeni bir konu açtı: <a href="{notif_url}">{topic_title}</a></span>[/type-cat_topic]
+            [type-reply]{notif_text}[/type-reply]
+            [type-like]{notif_text}[/type-like]
+            [type-mention]{notif_text}[/type-mention]
+            [type-follow_topic]<span class="forum-node__text">{notif_text}</span>[/type-follow_topic]
+            [type-cat_topic]<span class="forum-node__text">{notif_text}</span>[/type-cat_topic]
         </div>
         <div class="forum-node__meta">
             <span class="meta-item"><i class="fa fa-clock-o" aria-hidden="true"></i>{date}</span>
         </div>
     </div>
 
-    <button onclick="deleteNotif({id})" class="icon-action" title="Bildirimi sil">
+    <button onclick="deleteNotif({id})" class="icon-action" title="{forum_ui_notif_delete}">
         <i class="fa fa-trash" aria-hidden="true"></i>
     </button>
 </article>

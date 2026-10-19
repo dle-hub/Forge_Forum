@@ -67,8 +67,12 @@ $cid = intval($topic["cat_id"]);
 // 2. KATEGORİ BİLGİSİ
 // -------------------------------------------------
 $category = $db->super_query(
-    "SELECT name, alt_name FROM " . PREFIX . "_forum_cats WHERE id = '{$cid}'",
+    "SELECT id, name, alt_name, permissions FROM " . PREFIX . "_forum_cats WHERE id = '{$cid}'",
 );
+if (!$category || empty($category["id"]) || !forum_cat_access_allowed($category["permissions"] ?? "")) {
+    msgbox($lang['forum_access_denied'], $lang['forum_cat_no_perm']);
+    return;
+}
 $cat_name = $category["name"] ? stripslashes($category["name"]) : "";
 $cat_alt = $category["alt_name"] ?: "";
 
@@ -345,6 +349,7 @@ $parse = new ParseFilter();
 
 foreach ($posts as $idx => $p) {
     $tpl->load_template("forum/post.tpl");
+    forum_set_ui_lang($tpl, $lang);
 
     $p_name = htmlspecialchars(
         $p["user_name"] ?: $lang['forum_ajax_quote_guest'],

@@ -50,8 +50,10 @@ $rank = forum_get_user_rank($uid, intval($u["forum_points"]));
 // 3. İSTATİSTİKLER
 // -------------------------------------------------
 $topic_count = $db->super_query(
-    "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics
-     WHERE user_id='{$uid}' AND is_deleted=0 AND is_approved=1"
+    "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics t
+     INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
+     WHERE t.user_id='{$uid}' AND t.is_deleted=0 AND t.is_approved=1
+       AND " . forum_cat_access_where("c")
 );
 $topic_count = intval( $topic_count['cnt'] );
 
@@ -66,10 +68,12 @@ $last_date  = $u['lastdate'];
 // -------------------------------------------------
 $recent_topics = array();
 $db->query(
-    "SELECT id, title, alt_name, date, replies, views
-     FROM " . PREFIX . "_forum_topics
-     WHERE user_id='{$uid}' AND is_deleted=0 AND is_approved=1
-     ORDER BY date DESC LIMIT 5"
+    "SELECT t.id, t.title, t.alt_name, t.date, t.replies, t.views
+     FROM " . PREFIX . "_forum_topics t
+     INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
+     WHERE t.user_id='{$uid}' AND t.is_deleted=0 AND t.is_approved=1
+       AND " . forum_cat_access_where("c") . "
+     ORDER BY t.date DESC LIMIT 5"
 );
 while( $row = $db->get_row() ) $recent_topics[] = $row;
 
@@ -80,8 +84,10 @@ $recent_posts = array();
 $db->query(
     "SELECT p.id, p.text, p.date, t.id AS tid, t.title AS topic_title, t.alt_name AS topic_alt
      FROM " . PREFIX . "_forum_posts p
-     LEFT JOIN " . PREFIX . "_forum_topics t ON t.id = p.topic_id
+     INNER JOIN " . PREFIX . "_forum_topics t ON t.id = p.topic_id
+     INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
      WHERE p.user_id='{$uid}' AND p.is_deleted=0 AND p.is_approved=1
+       AND " . forum_cat_access_where("c") . "
      ORDER BY p.date DESC LIMIT 5"
 );
 while( $row = $db->get_row() ) $recent_posts[] = $row;
@@ -99,6 +105,7 @@ $forum_speedbar[''] = $uname;
 // 7. TPL
 // -------------------------------------------------
 $tpl->load_template( 'forum/profile.tpl' );
+forum_set_ui_lang($tpl, $lang);
 
 // Breadcrumb
 $home_url  = $config['http_home_url'];

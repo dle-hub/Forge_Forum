@@ -6,10 +6,10 @@
     <div class="forum-toolbar forum-toolbar--topic">
         <div class="forum-toolbar__head">
             <i class="fa fa-comments"></i>
-            <span class="forum-toolbar__topic">Konu: {topic_title}</span>
+            <span class="forum-toolbar__topic">{forum_ui_topic_label} {topic_title}</span>
             [topic-pinned]<span class="forum-topic-badge forum-badge-pinned"><i class="fa fa-thumb-tack"></i> {forum_ui_pinned_badge}</span>[/topic-pinned]
             [topic-locked]<span class="forum-topic-badge forum-badge-locked"><i class="fa fa-lock"></i> {forum_ui_locked_badge}</span>[/topic-locked]
-            [topic-solved]<span class="forum-topic-badge" style="background:#16a34a;color:#fff;"><i class="fa fa-check"></i> ÇÖZÜLDÜ</span>[/topic-solved]
+            [topic-solved]<span class="forum-topic-badge" style="background:#16a34a;color:#fff;"><i class="fa fa-check"></i> {forum_ui_solved_badge}</span>[/topic-solved]
         </div>
         <div class="forum-toolbar__bar">
             <div class="forum-toolbar__links">
@@ -94,13 +94,13 @@
     <div id="forum-mquote-bar" class="forum-mquote-bar" style="display:none;">
         <span class="forum-mquote-bar__count"><i class="fa fa-quote-left"></i> <span id="forum-mquote-count">0</span> {forum_ui_posts_selected}</span>
         <button type="button" onclick="forumInsertMultiquotes()" class="forum-btn-action"><i class="fa fa-edit"></i> {forum_ui_add_quotes}</button>
-        <button type="button" onclick="forumMultiquoteClear()" class="forum-btn-mini"><i class="fa fa-times"></i> Temizle</button>
+        <button type="button" onclick="forumMultiquoteClear()" class="forum-btn-mini"><i class="fa fa-times"></i> {forum_ui_clear}</button>
     </div>
 
     [has-similar]
     <div class="forum-category-block mt-4">
         <div class="forum-cat-header">
-            <span class="forum-cat-title"><i class="fa fa-sitemap"></i> Benzer Konular</span>
+            <span class="forum-cat-title"><i class="fa fa-sitemap"></i> {forum_ui_similar}</span>
             <span class="forum-cat-toggle"><i class="fa fa-minus"></i></span>
         </div>
         <div class="forum-similar">{similar_topics}</div>
@@ -212,7 +212,7 @@ function forumInsertUploadedContent(res) {
 
     var content = res.is_image
         ? '<img src="' + url + '" alt="" />'
-        : '<a href="' + url + '">' + (res.filename || 'dosya') + '</a>';
+        : '<a href="' + url + '">' + (res.filename || '{forum_ui_file}') + '</a>';
 
     if (typeof tinymce !== 'undefined') {
         var editor = tinymce.get('forum-reply-textarea');
@@ -399,7 +399,7 @@ function executeModAction(action, topicId) {
 
 function forumReportPost(postId) {
     if (typeof DLEprompt === 'undefined') {
-        var reason = prompt('Şikayet Nedeniniz:');
+        var reason = prompt('{forum_ui_report_reason}');
         if (reason && reason.trim() !== '') {
             submitForumReport(postId, reason);
         }

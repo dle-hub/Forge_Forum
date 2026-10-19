@@ -40,11 +40,8 @@ $unread_map =
 
 $cat_list = "";
 foreach ($categories as $cat) {
-    if ($cat["permissions"] != "all") {
-        $allowed = explode(",", $cat["permissions"]);
-        if (!in_array($member_id["user_group"], $allowed)) {
-            continue;
-        }
+    if (!forum_cat_access_allowed($cat["permissions"] ?? "")) {
+        continue;
     }
 
     $cat_link = $config["http_home_url"] . "forum/" . $cat["alt_name"] . "/";
@@ -67,6 +64,9 @@ foreach ($categories as $cat) {
 
     $subs = "";
     foreach ($sub_cats as $sub) {
+        if (!forum_cat_access_allowed($sub["permissions"] ?? "")) {
+            continue;
+        }
         $sub_link   = $config["http_home_url"] . "forum/" . $sub["alt_name"] . "/";
         $sub_name   = htmlspecialchars($sub["name"], ENT_QUOTES, "UTF-8");
         $sub_topics = intval($sub["topic_count"]);
@@ -77,6 +77,9 @@ foreach ($categories as $cat) {
         $sub_sub_ids  = [];
         $db->query("SELECT * FROM " . PREFIX . "_forum_cats WHERE parent_id='{$sub["id"]}' ORDER BY posi ASC");
         while ($ss = $db->get_row()) {
+            if (!forum_cat_access_allowed($ss["permissions"] ?? "")) {
+                continue;
+            }
             $ss_link        = $config["http_home_url"] . "forum/" . $ss["alt_name"] . "/";
             $ss_name        = htmlspecialchars($ss["name"], ENT_QUOTES, "UTF-8");
             $sub_sub_list[] = '<a href="' . $ss_link . '">' . $ss_name . '</a>';
@@ -130,8 +133,9 @@ foreach ($categories as $cat) {
 
         // --- subforum_row.tpl ile derle ---
         $tpl2 = new dle_template();
-        $tpl2->dir = TEMPLATE_DIR;
+        $tpl2->dir = $tpl->dir;
         $tpl2->load_template("forum/subforum_row.tpl");
+        forum_set_ui_lang($tpl2, $lang);
 
         $tpl2->set("{sf_url}",         $sub_link);
         $tpl2->set("{sf_name}",        $sub_name);

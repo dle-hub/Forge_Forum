@@ -4,7 +4,7 @@
 	<description
     >Modüler Admin Panelli, OOP, AJAX, SEO Uyumlu Forum Sistemi</description>
 	<icon>public/adminpanel/images/forum.png</icon>
-	<version>1.1.0</version>
+	<version>1.2.0</version>
 	<dleversion>19.1</dleversion>
 	<versioncompare />
 	<upgradeurl>https://raw.githubusercontent.com/dle-hub/Forge_Forum/main/release.json</upgradeurl>
@@ -33,6 +33,7 @@
 CREATE TABLE IF NOT EXISTS `{prefix}_forum_topics` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `cat_id` int(11) NOT NULL,
+  `prefix_id` int(11) DEFAULT '0',
   `title` varchar(255) NOT NULL,
   `alt_name` varchar(255) NOT NULL,
   `user_id` int(11) NOT NULL,
@@ -397,19 +398,7 @@ INSERT IGNORE INTO `{prefix}_forum_settings` (`name`, `value`) VALUES
 ('enable_drafts', '1'),
 ('enable_edit_history', '1'),
 ('enable_opengraph', '1'),
-('enable_ranks', '1');
-
-INSERT IGNORE INTO `{prefix}_forum_ranks` (`title`, `points`, `color`, `icon`, `badge_text`) VALUES
-('Yeni Üye', 0, '#888888', 'fa-user', 'Yeni'),
-('Aktif Üye', 100, '#27ae60', 'fa-user-plus', 'Aktif'),
-('Uzman', 500, '#2980b9', 'fa-star', 'Uzman'),
-('Efsane Üye', 2000, '#8e44ad', 'fa-trophy', 'Efsane'),
-('Moderatör', 9999, '#e74c3c', 'fa-shield', 'Mod');
-
-INSERT IGNORE INTO `{prefix}_admin_sections`
-(`name`, `title`, `descr`, `icon`, `allow_groups`)
-VALUES
-('forum', 'Forum Yönetimi', 'Forge Forum', 'forum.png', '1,2');]]></mysqlinstall>
+('enable_ranks', '1');]]></mysqlinstall>
 	<mysqlupgrade
     ><![CDATA[CREATE TABLE IF NOT EXISTS `{prefix}_forum_prefixes` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -574,11 +563,16 @@ CREATE TABLE IF NOT EXISTS `{prefix}_forum_cat_subs` (
   KEY `cat_id` (`cat_id`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;]]></mysqlupgrade>
 	<mysqlenable
-    ><![CDATA[INSERT IGNORE INTO `{prefix}_admin_sections` (`name`, `title`, `descr`, `icon`, `allow_groups`) VALUES ('forum', 'Forum Yönetimi', 'Forge Forum', 'forum.png', '1,2');]]></mysqlenable>
+    ><![CDATA[]]></mysqlenable>
 	<mysqldisable
     ><![CDATA[DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldisable>
 	<mysqldelete
-    ><![CDATA[DROP TABLE IF EXISTS `{prefix}_forum_promotions`;
+    ><![CDATA[DROP TABLE IF EXISTS `{prefix}_forum_cat_mods`;
+    DROP TABLE IF EXISTS `{prefix}_forum_drafts`;
+    DROP TABLE IF EXISTS `{prefix}_forum_follows`;
+    DROP TABLE IF EXISTS `{prefix}_forum_viewing`;
+    DROP TABLE IF EXISTS `{prefix}_forum_topic_ratings`;
+    DROP TABLE IF EXISTS `{prefix}_forum_promotions`;
 DROP TABLE IF EXISTS `{prefix}_forum_reports`;
 DROP TABLE IF EXISTS `{prefix}_forum_topic_tags`;
 DROP TABLE IF EXISTS `{prefix}_forum_tags`;
@@ -607,7 +601,7 @@ DROP TABLE IF EXISTS `{prefix}_forum_cats`;
 DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldelete>
 	<phpinstall
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_page_last', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat', 'forum_sitemap'];
     foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
 
     DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
@@ -618,14 +612,16 @@ DELETE FROM `{prefix}_admin_sections` WHERE `name` = 'forum';]]></mysqldelete>
     DLEUrl::AddRule('forum_search',    '/forum/search/',             '/index.php?do=forum&action=search');
     DLEUrl::AddRule('forum_edit',      '/forum/edit/{newsid}/',      '/index.php?do=forum&action=edit&id={newsid}');
     DLEUrl::AddRule('forum_profile',   '/forum/user/{user}/',        '/index.php?do=forum&action=profile&user={user}');
-    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
-    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name}/', '/index.php?do=forum&action=topic&id={newsid}');
-    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name:[^/]+}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
+    DLEUrl::AddRule('forum_topic_page_last','/forum/topic/{newsid}-{news_name:[^/]+}/page/last/', '/index.php?do=forum&action=topic&id={newsid}&page=last');
+    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name:[^/]+}/', '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name:[^/]+}.html',         '/index.php?do=forum&action=topic&id={newsid}');
     DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
     DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
     DLEUrl::AddRule('forum_tag', '/forum/etiket/{tag}/', '/index.php?do=forum&action=tag&tag={tag}');
     DLEUrl::AddRule('forum_rss', '/forum/rss/', '/index.php?do=forum&action=feed');
     DLEUrl::AddRule('forum_rss_cat', '/forum/rss/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=feed&cat={category}');
+    DLEUrl::AddRule('forum_sitemap', '/forum/sitemap.xml', '/index.php?do=forum&action=sitemap');
     DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
 
     if (is_array(DLEUrl::$rules)) {
@@ -654,10 +650,49 @@ foreach ($__ff_columns as $__ff_col) {
         $db->query("ALTER TABLE `" . $__ff_col[0] . "` " . $__ff_col[2]);
     }
 }
+// Yerelleştirilmiş başlangıç verileri (rütbeler + yönetim bölümü)
+$__ff_lang = strtolower((string) (isset($config['langs']) ? $config['langs'] : 'Turkish'));
+$__ff_rank_sets = array(
+    'turkish' => array(
+        array('Yeni Üye', 0, '#888888', 'fa-user', 'Yeni'),
+        array('Aktif Üye', 100, '#27ae60', 'fa-user-plus', 'Aktif'),
+        array('Uzman', 500, '#2980b9', 'fa-star', 'Uzman'),
+        array('Efsane Üye', 2000, '#8e44ad', 'fa-trophy', 'Efsane'),
+        array('Moderatör', 9999, '#e74c3c', 'fa-shield', 'Mod'),
+    ),
+    'english' => array(
+        array('New Member', 0, '#888888', 'fa-user', 'New'),
+        array('Active Member', 100, '#27ae60', 'fa-user-plus', 'Active'),
+        array('Expert', 500, '#2980b9', 'fa-star', 'Expert'),
+        array('Legendary Member', 2000, '#8e44ad', 'fa-trophy', 'Legend'),
+        array('Moderator', 9999, '#e74c3c', 'fa-shield', 'Mod'),
+    ),
+    'russian' => array(
+        array('Новый участник', 0, '#888888', 'fa-user', 'Новый'),
+        array('Активный участник', 100, '#27ae60', 'fa-user-plus', 'Актив'),
+        array('Эксперт', 500, '#2980b9', 'fa-star', 'Эксперт'),
+        array('Легендарный участник', 2000, '#8e44ad', 'fa-trophy', 'Легенда'),
+        array('Модератор', 9999, '#e74c3c', 'fa-shield', 'Мод'),
+    ),
+);
+$__ff_rank_rows = isset($__ff_rank_sets[$__ff_lang]) ? $__ff_rank_sets[$__ff_lang] : $__ff_rank_sets['english'];
+$__ff_rank_count = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_ranks");
+if (intval($__ff_rank_count['cnt']) === 0) {
+    foreach ($__ff_rank_rows as $__ff_row) {
+        $db->query(
+            "INSERT INTO " . PREFIX . "_forum_ranks (`title`, `points`, `color`, `icon`, `badge_text`) VALUES ('" .
+            $db->safesql($__ff_row[0]) . "', '" . intval($__ff_row[1]) . "', '" . $db->safesql($__ff_row[2]) . "', '" . $db->safesql($__ff_row[3]) . "', '" . $db->safesql($__ff_row[4]) . "')"
+        );
+    }
+}
+$__ff_admin_titles = array('turkish' => 'Forum Yönetimi', 'english' => 'Forum Management', 'russian' => 'Управление форумом');
+$__ff_admin_title = isset($__ff_admin_titles[$__ff_lang]) ? $__ff_admin_titles[$__ff_lang] : $__ff_admin_titles['english'];
+$db->query("INSERT IGNORE INTO " . PREFIX . "_admin_sections (`name`, `title`, `descr`, `icon`, `allow_groups`) VALUES ('forum', '" . $db->safesql($__ff_admin_title) . "', 'Forge Forum', 'forum.png', '1,2')");
+unset($__ff_lang, $__ff_rank_sets, $__ff_rank_rows, $__ff_rank_count, $__ff_row, $__ff_admin_titles, $__ff_admin_title);
 unset($__ff_columns, $__ff_col, $__ff_has);]]></phpinstall>
 	<phpupgrade
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_page_last', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat', 'forum_sitemap'];
     foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
 
     DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
@@ -668,14 +703,16 @@ unset($__ff_columns, $__ff_col, $__ff_has);]]></phpinstall>
     DLEUrl::AddRule('forum_search',    '/forum/search/',             '/index.php?do=forum&action=search');
     DLEUrl::AddRule('forum_edit',      '/forum/edit/{newsid}/',      '/index.php?do=forum&action=edit&id={newsid}');
     DLEUrl::AddRule('forum_profile',   '/forum/user/{user}/',        '/index.php?do=forum&action=profile&user={user}');
-    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
-    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name}/', '/index.php?do=forum&action=topic&id={newsid}');
-    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name:[^/]+}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
+    DLEUrl::AddRule('forum_topic_page_last','/forum/topic/{newsid}-{news_name:[^/]+}/page/last/', '/index.php?do=forum&action=topic&id={newsid}&page=last');
+    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name:[^/]+}/', '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name:[^/]+}.html',         '/index.php?do=forum&action=topic&id={newsid}');
     DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
     DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
     DLEUrl::AddRule('forum_tag', '/forum/etiket/{tag}/', '/index.php?do=forum&action=tag&tag={tag}');
     DLEUrl::AddRule('forum_rss', '/forum/rss/', '/index.php?do=forum&action=feed');
     DLEUrl::AddRule('forum_rss_cat', '/forum/rss/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=feed&cat={category}');
+    DLEUrl::AddRule('forum_sitemap', '/forum/sitemap.xml', '/index.php?do=forum&action=sitemap');
     DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
 
     if (is_array(DLEUrl::$rules)) {
@@ -705,10 +742,50 @@ foreach ($__ff_columns as $__ff_col) {
         $db->query("ALTER TABLE `" . $__ff_col[0] . "` " . $__ff_col[2]);
     }
 }
+// Eski kurulumlardaki sabit Türkçe rütbe/bölüm adlarını seçili dile taşı.
+// Yalnızca değiştirilmemiş varsayılan kayıtlar güncellenir; özelleştirmeler korunur.
+$__ff_lang = strtolower((string) (isset($config['langs']) ? $config['langs'] : 'Turkish'));
+$__ff_rank_migrate = array(
+    'turkish' => array(
+        array('Yeni Üye', 0, 'Yeni Üye', 'Yeni'),
+        array('Aktif Üye', 100, 'Aktif Üye', 'Aktif'),
+        array('Uzman', 500, 'Uzman', 'Uzman'),
+        array('Efsane Üye', 2000, 'Efsane Üye', 'Efsane'),
+        array('Moderatör', 9999, 'Moderatör', 'Mod'),
+    ),
+    'english' => array(
+        array('Yeni Üye', 0, 'New Member', 'New'),
+        array('Aktif Üye', 100, 'Active Member', 'Active'),
+        array('Uzman', 500, 'Expert', 'Expert'),
+        array('Efsane Üye', 2000, 'Legendary Member', 'Legend'),
+        array('Moderatör', 9999, 'Moderator', 'Mod'),
+    ),
+    'russian' => array(
+        array('Yeni Üye', 0, 'Новый участник', 'Новый'),
+        array('Aktif Üye', 100, 'Активный участник', 'Актив'),
+        array('Uzman', 500, 'Эксперт', 'Эксперт'),
+        array('Efsane Üye', 2000, 'Легендарный участник', 'Легенда'),
+        array('Moderatör', 9999, 'Модератор', 'Мод'),
+    ),
+);
+$__ff_rank_rows = isset($__ff_rank_migrate[$__ff_lang]) ? $__ff_rank_migrate[$__ff_lang] : $__ff_rank_migrate['english'];
+if ($__ff_lang !== 'turkish') {
+    foreach ($__ff_rank_rows as $__ff_row) {
+        $db->query(
+            "UPDATE " . PREFIX . "_forum_ranks SET `title` = '" . $db->safesql($__ff_row[2]) . "', `badge_text` = '" . $db->safesql($__ff_row[3]) . "' WHERE `title` = '" . $db->safesql($__ff_row[0]) . "' AND `points` = '" . intval($__ff_row[1]) . "'"
+        );
+    }
+}
+$__ff_admin_titles = array('turkish' => 'Forum Yönetimi', 'english' => 'Forum Management', 'russian' => 'Управление форумом');
+$__ff_admin_title = isset($__ff_admin_titles[$__ff_lang]) ? $__ff_admin_titles[$__ff_lang] : $__ff_admin_titles['english'];
+$db->query(
+    "UPDATE " . PREFIX . "_admin_sections SET `title` = '" . $db->safesql($__ff_admin_title) . "' WHERE `name` = 'forum' AND `title` IN ('Forum Yönetimi', 'Forum Management', 'Управление форумом')"
+);
+unset($__ff_lang, $__ff_rank_migrate, $__ff_rank_rows, $__ff_row, $__ff_admin_titles, $__ff_admin_title);
 unset($__ff_columns, $__ff_col, $__ff_has);]]></phpupgrade>
 	<phpenable
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_page_last', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat', 'forum_sitemap'];
     foreach($rules as $r) { DLEUrl::DeleteRule('custom.' . $r); }
 
     DLEUrl::AddRule('forum_main',      '/forum/',                    '/index.php?do=forum');
@@ -719,14 +796,16 @@ unset($__ff_columns, $__ff_col, $__ff_has);]]></phpupgrade>
     DLEUrl::AddRule('forum_search',    '/forum/search/',             '/index.php?do=forum&action=search');
     DLEUrl::AddRule('forum_edit',      '/forum/edit/{newsid}/',      '/index.php?do=forum&action=edit&id={newsid}');
     DLEUrl::AddRule('forum_profile',   '/forum/user/{user}/',        '/index.php?do=forum&action=profile&user={user}');
-    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
-    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name}/', '/index.php?do=forum&action=topic&id={newsid}');
-    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name}.html',         '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic_page','/forum/topic/{newsid}-{news_name:[^/]+}/page/{cstart}/', '/index.php?do=forum&action=topic&id={newsid}&page={cstart}');
+    DLEUrl::AddRule('forum_topic_page_last','/forum/topic/{newsid}-{news_name:[^/]+}/page/last/', '/index.php?do=forum&action=topic&id={newsid}&page=last');
+    DLEUrl::AddRule('forum_topic_slash','/forum/topic/{newsid}-{news_name:[^/]+}/', '/index.php?do=forum&action=topic&id={newsid}');
+    DLEUrl::AddRule('forum_topic',     '/forum/topic/{newsid}-{news_name:[^/]+}.html',         '/index.php?do=forum&action=topic&id={newsid}');
     DLEUrl::AddRule('forum_topic_alt', '/forum/{news_name:[a-zA-Z0-9_-]+}.html',         '/index.php?do=forum&action=topic&alt_name={news_name}');
     DLEUrl::AddRule('forum_cat_page',  '/forum/{category:[a-zA-Z0-9_-]+}/page/{cstart}/', '/index.php?do=forum&action=category&cat={category}&page={cstart}');
     DLEUrl::AddRule('forum_tag', '/forum/etiket/{tag}/', '/index.php?do=forum&action=tag&tag={tag}');
     DLEUrl::AddRule('forum_rss', '/forum/rss/', '/index.php?do=forum&action=feed');
     DLEUrl::AddRule('forum_rss_cat', '/forum/rss/{category:[a-zA-Z0-9_-]+}/', '/index.php?do=forum&action=feed&cat={category}');
+    DLEUrl::AddRule('forum_sitemap', '/forum/sitemap.xml', '/index.php?do=forum&action=sitemap');
     DLEUrl::AddRule('forum_cat',       '/forum/{category:[a-zA-Z0-9_-]+}/',             '/index.php?do=forum&action=category&cat={category}');
 
     if (is_array(DLEUrl::$rules)) {
@@ -737,15 +816,22 @@ unset($__ff_columns, $__ff_col, $__ff_has);]]></phpupgrade>
         DLEUrl::$rules = array_merge($custom_rules, $other_rules);
         DLEUrl::SaveRules(DLEUrl::$rules);
     }
-}]]></phpenable>
+}
+
+// Yerelleştirilmiş yönetim bölümü (yeniden etkinleştirmede)
+$__ff_lang = strtolower((string) (isset($config['langs']) ? $config['langs'] : 'Turkish'));
+$__ff_admin_titles = array('turkish' => 'Forum Yönetimi', 'english' => 'Forum Management', 'russian' => 'Управление форумом');
+$__ff_admin_title = isset($__ff_admin_titles[$__ff_lang]) ? $__ff_admin_titles[$__ff_lang] : $__ff_admin_titles['english'];
+$db->query("INSERT IGNORE INTO " . PREFIX . "_admin_sections (`name`, `title`, `descr`, `icon`, `allow_groups`) VALUES ('forum', '" . $db->safesql($__ff_admin_title) . "', 'Forge Forum', 'forum.png', '1,2')");
+unset($__ff_lang, $__ff_admin_titles, $__ff_admin_title);]]></phpenable>
 	<phpdisable
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_page_last', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat', 'forum_sitemap'];
     foreach($rules as $r) DLEUrl::DeleteRule('custom.' . $r);
 }]]></phpdisable>
 	<phpdelete
     ><![CDATA[if (class_exists('DLEUrl')) {
-    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat'];
+    $rules = ['forum_main', 'forum_new_topic', 'forum_new_topic_cat', 'forum_search', 'forum_tag', 'forum_edit', 'forum_profile', 'forum_topic_page', 'forum_topic_page_last', 'forum_topic_slash', 'forum_topic', 'forum_topic_alt', 'forum_cat_page', 'forum_cat', 'forum_reply', 'forum_reply_id', 'forum_rss', 'forum_rss_cat', 'forum_sitemap'];
     foreach($rules as $r) DLEUrl::DeleteRule('custom.' . $r);
 }
 
@@ -761,7 +847,13 @@ foreach ($__ff_drop as $__ff_d) {
         $db->query("ALTER TABLE `" . $__ff_d[0] . "` DROP COLUMN `" . $__ff_d[1] . "`");
     }
 }
-unset($__ff_drop, $__ff_d, $__ff_has);]]></phpdelete>
+unset($__ff_drop, $__ff_d, $__ff_has);
+
+// Şema geçiş kilitlerini temizle (yeniden kurulumda ALTER atlanmasın)
+foreach ((array) glob(ENGINE_DIR . '/cache/system/forum_schema_v*.lock') as $__ff_lock) {
+    if (is_file($__ff_lock)) { @unlink($__ff_lock); }
+}
+unset($__ff_lock);]]></phpdelete>
 	<notice><![CDATA[]]></notice>
 	<file name="engine/engine.php">
 		<operation action="replace">

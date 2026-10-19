@@ -20,23 +20,23 @@
             <div class="forum-name">
                 [type-reply]
                 <i class="fa fa-reply notif-type-icon notif-icon-reply"></i>
-                <strong>{sender}</strong>, <a href="{notif_url}">{topic_title}</a> konusuna cevap yazdı.
+                {notif_text}
                 [/type-reply]
                 [type-like]
                 <i class="fa fa-heart notif-type-icon notif-icon-like"></i>
-                <strong>{sender}</strong>, <a href="{notif_url}">{topic_title}</a> konusundaki mesajınızı beğendi.
+                {notif_text}
                 [/type-like]
                 [type-mention]
                 <i class="fa fa-at notif-type-icon notif-icon-mention"></i>
-                <strong>{sender}</strong>, <a href="{notif_url}">{topic_title}</a> konusunda sizden bahsetti.
+                {notif_text}
                 [/type-mention]
                 [type-follow_topic]
                 <i class="fa fa-user-plus notif-type-icon"></i>
-                Takip ettiğiniz <strong>{sender}</strong> yeni bir konu açtı: <a href="{notif_url}">{topic_title}</a>
+                {notif_text}
                 [/type-follow_topic]
                 [type-cat_topic]
                 <i class="fa fa-folder-open notif-type-icon"></i>
-                <strong>{sender}</strong>, abone olduğunuz kategoride yeni bir konu açtı: <a href="{notif_url}">{topic_title}</a>
+                {notif_text}
                 [/type-cat_topic]
             </div>
             <!-- Tarih -->
@@ -48,7 +48,7 @@
 
     <!-- Sağ: Sil Butonu -->
     <div style="flex-shrink:0; padding-left: 1rem;">
-        <button onclick="deleteNotif({id})" class="forum-btn-mini notif-delete-btn" title="Bildirimi sil">
+        <button onclick="deleteNotif({id})" class="forum-btn-mini notif-delete-btn" title="{forum_ui_notif_delete}">
             <i class="fa fa-trash"></i>
         </button>
     </div>

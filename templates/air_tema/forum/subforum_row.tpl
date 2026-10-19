@@ -7,17 +7,17 @@
 
     <!-- Ad + açıklama -->
     <div class="forum-node__info">
-        <h3 class="forum-node__title"><a href="{sf_url}">{sf_name}</a>[sf-unread] <span class="badge badge--new" title="Okunmamış konu">{sf_unread}</span>[/sf-unread]</h3>
+        <h3 class="forum-node__title"><a href="{sf_url}">{sf_name}</a>[sf-unread] <span class="badge badge--new" title="{forum_ui_unread_topic}">{sf_unread}</span>[/sf-unread]</h3>
         <p class="forum-node__desc">{sf_description}</p>
         [sf-has-subforums]
-        <div class="chips chips--tags forum-node__subs">Alt forumlar: {sf_subforums}</div>
+        <div class="chips chips--tags forum-node__subs">{forum_ui_subforums}: {sf_subforums}</div>
         [/sf-has-subforums]
     </div>
 
     <!-- İstatistik -->
     <div class="forum-node__stats">
-        <span class="forum-node__stat"><b>{sf_topics}</b> konu</span>
-        <span class="forum-node__stat"><b>{sf_posts}</b> mesaj</span>
+        <span class="forum-node__stat"><b>{sf_topics}</b> {forum_ui_topics}</span>
+        <span class="forum-node__stat"><b>{sf_posts}</b> {forum_ui_posts}</span>
     </div>
 
     <!-- Son ileti -->
@@ -30,7 +30,7 @@
         </span>
         [/sf-has-lastpost]
         [sf-no-lastpost]
-        <span class="forum-node__lastmeta">Hiç ileti yok</span>
+        <span class="forum-node__lastmeta">{forum_ui_no_posts_yet}</span>
         [/sf-no-lastpost]
     </div>
 </article>

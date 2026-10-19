@@ -27,12 +27,9 @@ $category = $db->super_query( "SELECT * FROM " . PREFIX . "_forum_cats WHERE id 
 if( !$category['id'] ) { msgbox( $lang['forum_err_title'], $lang['forum_cat_not_found'] ); return; }
 
 // Yetki kontrolü (misafir dahil tüm gruplar için geçerli)
-if( $category['permissions'] != 'all' ) {
-    $allowed = explode( ',', $category['permissions'] );
-    if( !in_array( $member_id['user_group'], $allowed ) ) {
-        msgbox( $lang['forum_access_denied'], $lang['forum_cat_no_perm'] );
-        return;
-    }
+if( !forum_cat_access_allowed( $category['permissions'] ) ) {
+    msgbox( $lang['forum_access_denied'], $lang['forum_cat_no_perm'] );
+    return;
 }
 
 // SEO meta
@@ -183,8 +180,9 @@ foreach( $topics as $t ) {
 
     // --- topic_row.tpl ile derle ---
     $tpl2 = new dle_template();
-    $tpl2->dir = TEMPLATE_DIR;
+    $tpl2->dir = $tpl->dir;
     $tpl2->load_template("forum/topic_row.tpl");
+    forum_set_ui_lang($tpl2, $lang);
 
     $tpl2->set("{t_row_class}",   $row_class);
     $tpl2->set("{t_title_style}", $title_style);

@@ -2618,3 +2618,10 @@ textarea.wysiwygeditor {
     border-top: 1px solid var(--forum-border-color, #e5e7eb);
   }
 }
+
+/* Kategori başlığı: sonraki .forum-cat-bar kuralı koyu başlığı ezmesin */
+.forum-cat-bar.forum-cat-header {
+  background: var(--forum-bg-header);
+  color: #ffffff;
+  border-bottom: 1px solid var(--forum-bg-header);
+}

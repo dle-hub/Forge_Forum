@@ -18,6 +18,7 @@ if (empty($forum_cfg["enable_statistics"])) {
 
 $P = PREFIX;
 $U = USERPREFIX;
+$__stats_access = forum_cat_access_where("c");
 
 $metatags['title'] = ($lang['forum_stats_title'] ?? "Forum İstatistikleri") . " - " . $forum_title;
 $forum_speedbar[$config['http_home_url'] . 'forum/'] = $lang['forum_breadcrumb_forum'];
@@ -26,23 +27,23 @@ $forum_speedbar[''] = $lang['forum_stats_title'] ?? "Forum İstatistikleri";
 // -------------------------------------------------
 // 1. GENEL SAYILAR
 // -------------------------------------------------
-$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_topics WHERE is_deleted=0 AND is_approved=1");
+$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_topics t INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id WHERE t.is_deleted=0 AND t.is_approved=1 AND {$__stats_access}");
 $tot_topics = intval($r['c']);
 
-$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_posts WHERE is_deleted=0 AND is_approved=1");
+$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_posts p INNER JOIN {$P}_forum_topics t ON t.id=p.topic_id INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id WHERE p.is_deleted=0 AND p.is_approved=1 AND {$__stats_access}");
 $tot_posts = intval($r['c']);
 
 $r = $db->super_query("SELECT COUNT(*) AS c FROM {$U}_users");
 $tot_users = intval($r['c']);
 
-$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_topics WHERE is_deleted=0 AND is_approved=1 AND DATE(date)=CURDATE()");
+$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_topics t INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id WHERE t.is_deleted=0 AND t.is_approved=1 AND DATE(t.date)=CURDATE() AND {$__stats_access}");
 $today_topics = intval($r['c']);
 
-$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_posts WHERE is_deleted=0 AND is_approved=1 AND DATE(date)=CURDATE()");
+$r = $db->super_query("SELECT COUNT(*) AS c FROM {$P}_forum_posts p INNER JOIN {$P}_forum_topics t ON t.id=p.topic_id INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id WHERE p.is_deleted=0 AND p.is_approved=1 AND DATE(p.date)=CURDATE() AND {$__stats_access}");
 $today_posts = intval($r['c']);
 
 // Günlük ortalama mesaj
-$first = $db->super_query("SELECT MIN(date) AS d FROM {$P}_forum_posts WHERE is_deleted=0");
+$first = $db->super_query("SELECT MIN(p.date) AS d FROM {$P}_forum_posts p INNER JOIN {$P}_forum_topics t ON t.id=p.topic_id INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id WHERE p.is_deleted=0 AND {$__stats_access}");
 $days = 1;
 if (!empty($first['d'])) {
     $d = strtotime($first['d']);
@@ -65,7 +66,7 @@ if (!empty($newest['user_id'])) {
 // -------------------------------------------------
 $cats = [];
 $db->query(
-    "SELECT id, name, alt_name, parent_id FROM {$P}_forum_cats ORDER BY parent_id ASC, posi ASC",
+    "SELECT c.id, c.name, c.alt_name, c.parent_id FROM {$P}_forum_cats c WHERE {$__stats_access} ORDER BY c.parent_id ASC, c.posi ASC",
 );
 while ($c = $db->get_row()) {
     $cats[] = $c;
@@ -112,8 +113,10 @@ $rank = 0;
 $db->query(
     "SELECT p.user_id, COUNT(*) AS cnt, u.name, u.foto
      FROM {$P}_forum_posts p
+     INNER JOIN {$P}_forum_topics t ON t.id = p.topic_id
+     INNER JOIN {$P}_forum_cats c ON c.id = t.cat_id
      INNER JOIN {$U}_users u ON u.user_id = p.user_id
-     WHERE p.is_deleted=0 AND p.is_approved=1 AND p.user_id > 0
+     WHERE p.is_deleted=0 AND p.is_approved=1 AND p.user_id > 0 AND {$__stats_access}
      GROUP BY p.user_id
      ORDER BY cnt DESC
      LIMIT 10",
@@ -147,9 +150,10 @@ if (!function_exists('forum_stats_topic_url')) {
 
 $viewed_rows = '';
 $db->query(
-    "SELECT id, title, alt_name, views, replies FROM {$P}_forum_topics
-     WHERE is_deleted=0 AND is_approved=1
-     ORDER BY views DESC LIMIT 10",
+    "SELECT t.id, t.title, t.alt_name, t.views, t.replies FROM {$P}_forum_topics t
+     INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id
+     WHERE t.is_deleted=0 AND t.is_approved=1 AND {$__stats_access}
+     ORDER BY t.views DESC LIMIT 10",
 );
 while ($tv = $db->get_row()) {
     $turl = forum_stats_topic_url($tv, $config);
@@ -170,9 +174,10 @@ $viewed_table = '<table class="forum-statstable"><thead><tr><th>' . ($lang['foru
 // -------------------------------------------------
 $replied_rows = '';
 $db->query(
-    "SELECT id, title, alt_name, views, replies FROM {$P}_forum_topics
-     WHERE is_deleted=0 AND is_approved=1
-     ORDER BY replies DESC LIMIT 10",
+    "SELECT t.id, t.title, t.alt_name, t.views, t.replies FROM {$P}_forum_topics t
+     INNER JOIN {$P}_forum_cats c ON c.id=t.cat_id
+     WHERE t.is_deleted=0 AND t.is_approved=1 AND {$__stats_access}
+     ORDER BY t.replies DESC LIMIT 10",
 );
 while ($tr = $db->get_row()) {
     $turl = forum_stats_topic_url($tr, $config);

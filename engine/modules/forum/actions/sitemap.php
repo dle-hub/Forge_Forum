@@ -32,8 +32,13 @@ $urls[] = [
     "priority" => "1.0",
 ];
 
-// Kategoriler
-$db->query("SELECT id, alt_name FROM " . PREFIX . "_forum_cats ORDER BY posi ASC, name ASC");
+// Kategoriler — sitemap her zaman misafir (grup 5) bakışıyla üretilir.
+$sitemap_access = forum_cat_access_where("c", 5);
+$db->query(
+    "SELECT c.id, c.alt_name FROM " . PREFIX . "_forum_cats c
+     WHERE {$sitemap_access}
+     ORDER BY c.posi ASC, c.name ASC",
+);
 while ($c = $db->get_row()) {
     $urls[] = [
         "loc" => $home . "forum/" . $c["alt_name"] . "/",
@@ -45,9 +50,10 @@ while ($c = $db->get_row()) {
 
 // Konular
 $db->query(
-    "SELECT id, alt_name, last_post_date, date FROM " . PREFIX . "_forum_topics
-     WHERE is_deleted=0 AND is_approved=1
-     ORDER BY last_post_date DESC
+    "SELECT t.id, t.alt_name, t.last_post_date, t.date FROM " . PREFIX . "_forum_topics t
+     INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
+     WHERE t.is_deleted=0 AND t.is_approved=1 AND {$sitemap_access}
+     ORDER BY t.last_post_date DESC
      LIMIT {$limit}",
 );
 while ($t = $db->get_row()) {

@@ -66,8 +66,9 @@ $db->query("UPDATE " . PREFIX . "_forum_notifs SET is_read = 1 WHERE user_id = '
 $rows_html = "";
 foreach ($notif_rows as $n) {
     $tpl2 = new dle_template();
-    $tpl2->dir = TEMPLATE_DIR;
+    $tpl2->dir = $tpl->dir;
     $tpl2->load_template("forum/notification_row.tpl");
+    forum_set_ui_lang($tpl2, $lang);
 
     $tpl2->set("{id}", intval($n['id']));
     $tpl2->set("{sender}", htmlspecialchars($n['sender_name'] ?: $lang['forum_ajax_quote_guest'], ENT_QUOTES, 'UTF-8'));
@@ -82,6 +83,10 @@ foreach ($notif_rows as $n) {
 
     // Tip blokları
     $notif_type   = (string) $n['type'];
+    $notif_sender_html = '<strong>' . htmlspecialchars($n['sender_name'] ?: $lang['forum_ajax_quote_guest'], ENT_QUOTES, 'UTF-8') . '</strong>';
+    $notif_topic_html  = '<a href="' . htmlspecialchars($notif_url, ENT_QUOTES, 'UTF-8') . '">' . htmlspecialchars(stripslashes((string) $n['topic_title']), ENT_QUOTES, 'UTF-8') . '</a>';
+    $notif_text_key    = 'forum_notif_text_' . $notif_type;
+    $tpl2->set("{notif_text}", isset($lang[$notif_text_key]) ? sprintf($lang[$notif_text_key], $notif_sender_html, $notif_topic_html) : '');
     $known_types  = ['reply', 'like', 'mention', 'follow_topic', 'cat_topic'];
     foreach ($known_types as $kt) {
         if ($kt === $notif_type) {

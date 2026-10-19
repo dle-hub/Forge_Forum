@@ -78,6 +78,12 @@ if (!$topic["is_approved"] && $member_id["user_group"] > 2) {
 
 $cid = intval($topic["cat_id"]);
 
+// Kategori izinleri konunun kendi access kurallarindan bagimsizdir.
+if (!forum_category_access_allowed($cid)) {
+    msgbox($lang['forum_access_denied'], $lang['forum_cat_no_perm']);
+    return;
+}
+
 // -------------------------------------------------
 // 3. POST İŞLEMİ
 // -------------------------------------------------

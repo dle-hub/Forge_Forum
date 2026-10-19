@@ -58,6 +58,7 @@ if( $has_search ) {
                  LEFT JOIN " . PREFIX . "_users u ON u.user_id = t.user_id
                  LEFT JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
                  WHERE t.is_deleted = 0 AND t.is_approved = 1
+                       AND " . forum_cat_access_where("c") . "
                  ORDER BY t.last_bump_date DESC
                  LIMIT 300"
             );
@@ -79,7 +80,10 @@ if( $has_search ) {
             $forum_speedbar[''] = $lang['forum_search_today_breadcrumb'];
             
             $today_start = date('Y-m-d 00:00:00');
-            $cnt_row = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics WHERE last_bump_date >= '{$today_start}' AND is_deleted=0 AND is_approved=1");
+            $cnt_row = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics t
+                INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
+                WHERE t.last_bump_date >= '{$today_start}' AND t.is_deleted=0 AND t.is_approved=1
+                AND " . forum_cat_access_where("c"));
             $total = intval($cnt_row['cnt']);
             
             if( $total > 0 ) {
@@ -89,6 +93,7 @@ if( $has_search ) {
                      LEFT JOIN " . PREFIX . "_users u ON u.user_id=t.user_id
                      LEFT JOIN " . PREFIX . "_forum_cats c ON c.id=t.cat_id
                      WHERE t.last_bump_date >= '{$today_start}' AND t.is_deleted=0 AND t.is_approved=1
+                       AND " . forum_cat_access_where("c") . "
                      ORDER BY t.last_bump_date DESC
                      LIMIT {$offset}, {$perpage}"
                 );
@@ -121,7 +126,7 @@ if( $has_search ) {
 
         if( $in === 'topics' ) {
             // Konu başlıklarında / etiketlerde ara + yazar + tarih
-            $w = "t.is_deleted=0 AND t.is_approved=1";
+            $w = "t.is_deleted=0 AND t.is_approved=1 AND " . forum_cat_access_where("c");
             if( !empty($q) ) {
                 $w .= " AND (t.title LIKE '%{$safe_q}%' OR t.id IN (
                      SELECT tt.topic_id FROM " . PREFIX . "_forum_topic_tags tt
@@ -135,7 +140,9 @@ if( $has_search ) {
             if( $date_from !== '' ) $w .= " AND t.date >= '{$date_from} 00:00:00'";
             if( $date_to !== '' )   $w .= " AND t.date <= '{$date_to} 23:59:59'";
 
-            $total = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics t WHERE {$w}");
+            $total = $db->super_query("SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_topics t
+                INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
+                WHERE {$w}");
             $total = intval($total['cnt']);
 
             if($total > 0) {
@@ -152,7 +159,7 @@ if( $has_search ) {
             }
         } else {
             // Mesaj içeriklerinde ara + yazar + tarih
-            $w = "p.is_deleted=0 AND p.is_approved=1 AND t.is_deleted=0 AND t.is_approved=1";
+            $w = "p.is_deleted=0 AND p.is_approved=1 AND t.is_deleted=0 AND t.is_approved=1 AND " . forum_cat_access_where("c");
             if( !empty($q) ) $w .= " AND p.text LIKE '%{$safe_q}%'";
             if( $author !== '' ) {
                 $w .= $author_ok ? " AND p.user_id='{$author_id}'" : " AND p.user_id='-1'";
@@ -163,6 +170,7 @@ if( $has_search ) {
             $total = $db->super_query(
                 "SELECT COUNT(*) AS cnt FROM " . PREFIX . "_forum_posts p
                  INNER JOIN " . PREFIX . "_forum_topics t ON t.id=p.topic_id
+                 INNER JOIN " . PREFIX . "_forum_cats c ON c.id=t.cat_id
                  WHERE {$w}"
             );
             $total = intval($total['cnt']);
@@ -173,6 +181,7 @@ if( $has_search ) {
                      FROM " . PREFIX . "_forum_posts p
                      LEFT JOIN " . PREFIX . "_users u ON u.user_id=p.user_id
                      INNER JOIN " . PREFIX . "_forum_topics t ON t.id=p.topic_id
+                     INNER JOIN " . PREFIX . "_forum_cats c ON c.id=t.cat_id
                      WHERE {$w}
                      ORDER BY p.date DESC
                      LIMIT {$offset}, {$perpage}"
@@ -221,9 +230,9 @@ if( $has_search && count($results) ) {
                 <div class="forum-node__info">
                     <h3 class="forum-node__title"><a href="{$r_url}">{$r_title}</a></h3>
                     <div class="forum-node__meta">
-                        <span class="meta-item">Kategori: {$r_cat}</span>
+                        <span class="meta-item">{$lang['forum_ui_category_label']} {$r_cat}</span>
                         <span class="meta-dot" aria-hidden="true"></span>
-                        <span class="meta-item">Yazar: {$r_author}</span>
+                        <span class="meta-item">{$lang['forum_ui_author_label']} {$r_author}</span>
                     </div>
                 </div>
                 <div class="forum-node__stats">
@@ -244,9 +253,9 @@ R;
             <article class="forum-node">
                 <span class="icon-action forum-node__icon" aria-hidden="true"><i class="fa fa-comment-o"></i></span>
                 <div class="forum-node__info">
-                    <h3 class="forum-node__title"><a href="{$r_url}">Konu: {$r_topic}</a></h3>
+                    <h3 class="forum-node__title"><a href="{$r_url}">{$lang['forum_ui_topic_label']} {$r_topic}</a></h3>
                     <div class="forum-node__meta">
-                        <span class="meta-item">Yazan: {$r_author}</span>
+                        <span class="meta-item">{$lang['forum_ui_written_by']} {$r_author}</span>
                         <span class="meta-dot" aria-hidden="true"></span>
                         <span class="meta-item">{$r_text}...</span>
                     </div>

@@ -13,8 +13,8 @@
 
     <!-- Genel bakış kutuları -->
     <div class="forum-statsgrid">
-        <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-comments" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_topics}</div><div class="forum-statbox__label">Konu</div></div>
-        <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-comment-o" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_posts}</div><div class="forum-statbox__label">Mesaj</div></div>
+        <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-comments" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_topics}</div><div class="forum-statbox__label">{forum_ui_topics}</div></div>
+        <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-comment-o" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_posts}</div><div class="forum-statbox__label">{forum_ui_posts}</div></div>
         <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-users" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_members}</div><div class="forum-statbox__label">{stat_members_label}</div></div>
         <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-calendar-plus-o" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_topics_today}</div><div class="forum-statbox__label">{forum_stats_today_topics}</div></div>
         <div class="forum-statbox"><div class="forum-statbox__icon"><i class="fa fa-calendar-check-o" aria-hidden="true"></i></div><div class="forum-statbox__num">{stat_posts_today}</div><div class="forum-statbox__label">{forum_stats_today_posts}</div></div>

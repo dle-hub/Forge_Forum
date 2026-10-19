@@ -52,16 +52,16 @@ while ($r = $db->get_row()) {
         .   '<h3 class="forum-node__title"><a href="' . $turl . '">' . $title . '</a></h3>'
         .   '<div class="forum-node__meta">'
         .     ($cat !== '' ? '<span class="meta-item"><i class="fa fa-folder-o" aria-hidden="true"></i> ' . $cat . '</span><span class="meta-dot" aria-hidden="true"></span>' : '')
-        .     '<span class="meta-item">Abonelik: ' . $sub_date . '</span>'
+        .     '<span class="meta-item">' . $lang['forum_ui_subscription'] . ' ' . $sub_date . '</span>'
         .   '</div>'
         . '</div>'
         . '<div class="forum-node__stats">'
-        .   '<span class="forum-node__stat"><b>' . $replies . '</b> cevap</span>'
-        .   '<span class="forum-node__stat"><b>' . $views . '</b> görüntüleme</span>'
+        .   '<span class="forum-node__stat"><b>' . $replies . '</b> ' . $lang['forum_ui_replies_lc'] . '</span>'
+        .   '<span class="forum-node__stat"><b>' . $views . '</b> ' . $lang['forum_ui_views_lc'] . '</span>'
         . '</div>'
         . '<div class="forum-node__last">'
         .   '<span class="forum-node__lastmeta">' . $last . '</span>'
-        .   '<button type="button" onclick="forumUnsubscribe(' . $tid . ')" class="icon-action" title="Abonelikten çık"><i class="fa fa-bell-slash-o" aria-hidden="true"></i></button>'
+        .   '<button type="button" onclick="forumUnsubscribe(' . $tid . ')" class="icon-action" title="' . htmlspecialchars($lang['forum_ui_unsubscribe'], ENT_QUOTES, "UTF-8") . '"><i class="fa fa-bell-slash-o" aria-hidden="true"></i></button>'
         . '</div>'
         . '</article>';
 }

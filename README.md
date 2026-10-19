@@ -700,7 +700,7 @@ DLE site dili ne ise o klasördeki `forum.lng` otomatik yüklenir (`engine/modul
 
 ## 11. Özelleştirme ipuçları
 
-1. **Yeni tema:** `templates/Default/forum/` klasörünü kopyalayıp `{skin}/forum/` altına yapıştırın; `main.tpl`'e CSS/JS ekleyin.
+1. **Yeni tema:** Tema `forum/` klasörü içermiyorsa şablonlar otomatik olarak `templates/Default/forum/` üzerinden yüklenir; özelleştirmek için `Default/forum` klasörünü kopyalayıp `{skin}/forum/` altına yapıştırın. CSS/JS, temanın `main.tpl` dosyasında elle dahil edilmemişse otomatik eklenir.
 2. **Koşul bloğu eklemek:** PHP'de `$tpl->set("[blok-adi]", "");` + `$tpl->set("[/blok-adi]", "");` veya `set_block(..., "")` ile silin.
 3. **Satır şablonu:** `topic_row.tpl` gibi alt şablonlar `$tpl2->load_template()` ile döngüde derlenir; ana şablona `{topic_rows}` olarak basılır.
 4. **Rank görseli:** Admin → Rütbe Ayarları → `administrator.png` gibi dosya adı; dosyayı `templates/{skin}/forum/ranks/` altına koyun.
@@ -710,8 +710,16 @@ DLE site dili ne ise o klasördeki `forum.lng` otomatik yüklenir (`engine/modul
 
 ## 12. Sürüm
 
-- **Eklenti:** Forge Forum **v1.1.0** (17.10.2026)
+- **Eklenti:** Forge Forum **v1.2.0** (19.10.2026)
 - **Kılavuz:** Şablon etiketleri — Forge Forum motoru ile uyumlu
+
+**1.2.0 öne çıkanlar:**
+
+- Kategori izinlerinin konu, arama, RSS, etiket ve sitemap çıktılarında zorunlu kılınması (P0)
+- Kurulum/kaldırma tablo paritesi, şema kilidi temizliği ve `prefix_id` düzeltmesi (P1)
+- CSS/JS otomatik yükleme ve aktif tema şablon fallback'i (P1)
+- `/forum/sitemap.xml` ve `page/last` SEO rotaları (P2)
+- TR/EN/RU rütbe ve yönetim bölümü yerelleştirmesi + kalan arayüz metinleri (P3)
 
 **1.1.0 öne çıkanlar:**
 

@@ -1,6 +1,6 @@
 # Forge Forum — Güncelleme Notları
 
-**Tarih:** 17.10.2026
+**Sürüm:** 1.2.0 — **Tarih:** 19.10.2026
 
 ---
 
@@ -48,6 +48,18 @@
 - **Arayüz metinleri tamamen dil dosyasına taşındı.** Ana sayfa, kategori, istatistik, bildirimler, arama, yeni konu, konu ve düzenleme sayfalarındaki görünür etiketler, butonlar, placeholder'lar ve JS bildirimleri `{forum_ui_*}`, `{forum_stats_*}`, `{forum_search_*}`, `{forum_new_*}`, `{forum_edit_*}` etiketlerine çevrildi; değerler `forum_set_ui_lang()` ile `language/{Turkish,English,Russian}/forum.lng` dosyalarından yükleniyor. `engine/modules/forum/editor_helpers.php`, `engine/modules/forum/actions/*`, `templates/{air_tema,Default}/forum/*.tpl`, `language/{Turkish,English,Russian}/forum.lng`
 
 ## ✅ Düzeltmeler (bu sürüm)
+
+- **Kapalı kategori erişim açığı (P0).** Kategori `permissions` alanı yalnızca kategori sayfasında denetleniyordu; konuya doğrudan bağlantıyla (`/forum/topic/...`) girildiğinde, RSS, arama, etiket ve sitemap çıktılarında kapalı kategorilerin içeriği görünebiliyordu. Ortak `forum_cat_access_allowed()` / `forum_cat_access_where()` yardımcıları eklendi; tüm giriş noktaları artık kategori izinlerini denetliyor (yönetici grubu 1 her zaman erişir). `engine/modules/forum/permission_helpers.php`, `engine/modules/forum/init.php`, `engine/modules/forum/actions/{topic,reply,category,main,new_topic,search,feed,sitemap,tag,statistics,profile}.php`, `engine/ajax/forum_quote.php`
+
+- **Kurulum / kaldırma tutarlılığı (P1).** Kaldırma işlemi artık 30 forum tablosunun tamamını siliyor (`_forum_topic_ratings`, `_forum_viewing`, `_forum_follows`, `_forum_drafts`, `_forum_cat_mods` eklendi). `forum_schema_v*.lock` dosyaları kaldırmada temizleniyor; `prefix_id` ilk kurulumdaki `CREATE TABLE` içine eklendi ve `init.php` artık kilit dosyasına güvenmeden kolonu her istekte doğruluyor. `forge_forum.xml`, `engine/modules/forum/init.php`
+
+- **CSS/JS otomatik yükleme ve tema fallback (P1).** `forum.css` / `forum.js`, aktif temanın `main.tpl` dosyasında elle dahil edilmemişse `$tpl->css_array` / `$tpl->js_array` üzerinden otomatik ekleniyor. Aktif temada `forum/` klasörü yoksa (ör. Smart) şablonlar `templates/Default/forum` üzerinden yükleniyor; böylece her tema için ayrı kopya gerekmiyor. `engine/modules/forum/init.php`, `actions/{main,category,notifications}.php`
+
+- **SEO rotaları (P2).** `/forum/sitemap.xml` rotası eklendi. `/forum/topic/{id}-{ad}/page/last/` için özel rota tanımlandı; konu rotalarındaki `{news_name}` deseni `[^/]+` ile sınırlandırılarak `page/last` bölümünün konu adına yutulması engellendi. `forge_forum.xml`
+
+- **Yerelleştirme (P3).** Başlangıç rütbeleri ve yönetim bölümü adı artık kurulumda `$config['langs']` değerine göre TR/EN/RU oluşturuluyor; güncellemede yalnızca değiştirilmemiş varsayılan kayıtlar taşınıyor (özel rütbeler korunuyor). `mysqlenable` içindeki sabit Türkçe bölüm ekleme kaldırıldı; yerelleştirilmiş ekleme `phpenable`'a taşındı (kapat/aç sonrası da doğru dil). Kalan sabit Türkçe arayüz metinleri (`post`, `profile`, `mod`, `online`, `history`, `topic_row`, `subforum_row`, `notification_row`, `topic`, `statistics`, `category` şablonları) `{forum_ui_*}` etiketlerine ve dil dosyalarına taşındı. `forge_forum.xml`, `engine/modules/forum/editor_helpers.php`, `engine/modules/forum/actions/*`, `templates/{air_tema,Default}/forum/*.tpl`, `language/{Turkish,English,Russian}/forum.lng`
+
+- **Temiz kurulum doğrulaması (P1/P3).** DLE 21.0.104 sıfırdan kuruldu (`dle_fresh`), plugin yönetim panelindeki yükleme formu üzerinden kuruldu. 30 forum tablosu, Rusça rütbeler ve "Управление форумом" bölümü doğrulandı. Kaldırma 30 tabloyu ve 8 şema kilidini temizledi; yeniden etkinleştirme yerelleştirilmiş bölümü geri ekledi. Ön yüz, kapalı kategori, arama/RSS/sitemap, `/forum/sitemap.xml` ve `page/last` testleri geçti.
 
 - **Kategori kaydetme fatal hatası.** Yönetim > Forum > Kategoriler'de kaydetme sırasında `forum_admin_sync_cat_mods()` tanımsız kalıyordu. Koşullu fonksiyon tanımları PHP tarafından hoist edilmediği için POST işleyicisinden önce çalışmıyordu; moderatör yardımcıları (`forum_admin_sync_cat_mods`, `forum_admin_cat_mods_str`) dosyanın üstüne taşındı. `engine/inc/forum/categories.php`
 
@@ -160,6 +172,8 @@
 
 - **Paketlenen Froala FA'sı 4.7.0'a hizalandı** (4.5.0 → 4.7.0, yalnızca `woff2`).
   `public/editor/froala/fonts/`
+- **Forum sayfalarında FA 4.7.0 garanti altına alındı.** Bazı temalar (ör. DLE 21 **Air**) `fa-*` ikon fontunu yüklemediği için `main.tpl`'e bağımlı kalmadan `init.php` üzerinden `public/fonts/fontawesome/styles.min.css` ekleniyor (tema zaten yüklüyorsa çift eklenmez). `engine/modules/forum/init.php`
+- **Kategori başlığı görünümü düzeltildi.** `.forum-cat-bar` kuralı `.forum-cat-header`'ın koyu arka planını eziyor, başlık açık zeminde beyaz kalıyordu; `.forum-cat-bar.forum-cat-header` seçicisiyle koyu başlık + beyaz yazı sabitlendi. `templates/{air_tema,Default}/forum/forum.css`
 
 ---
 

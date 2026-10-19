@@ -23,6 +23,8 @@ if (file_exists(ROOT_DIR . '/language/' . $forum_lang_dir . '/forum.lng')) {
     }
 }
 
+include_once DLEPlugins::Check(ENGINE_DIR . '/modules/forum/permission_helpers.php');
+
 header('Content-Type: application/json; charset=utf-8');
 
 if( !$is_logged ) {
@@ -63,14 +65,19 @@ $quotes = '';
 foreach ($post_ids as $pid) {
     // Mesajı + yazarı çek
     $post = $db->super_query(
-        "SELECT p.*, u.name AS author_name, t.is_locked, t.is_deleted AS topic_deleted
+        "SELECT p.*, u.name AS author_name, t.is_locked, t.is_deleted AS topic_deleted,
+                c.permissions AS cat_permissions
          FROM " . PREFIX . "_forum_posts p
          LEFT JOIN " . PREFIX . "_users u ON u.user_id = p.user_id
          LEFT JOIN " . PREFIX . "_forum_topics t ON t.id = p.topic_id
+         INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
          WHERE p.id = '{$pid}'"
     );
 
     if (!$post || !$post['id'] || $post['is_deleted'] || $post['topic_deleted']) {
+        continue;
+    }
+    if (!forum_cat_access_allowed($post['cat_permissions'] ?? '')) {
         continue;
     }
     if ($post['is_locked'] && $member_id['user_group'] > 2) {

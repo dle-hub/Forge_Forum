@@ -33,12 +33,18 @@ $cat_filter = "";
 if ($feed_cat_alt !== "") {
     $alt_sql = $db->safesql($feed_cat_alt);
     $cat = $db->super_query(
-        "SELECT id, name, alt_name FROM " . PREFIX . "_forum_cats WHERE alt_name = '{$alt_sql}'",
+        "SELECT id, name, alt_name, permissions FROM " . PREFIX . "_forum_cats WHERE alt_name = '{$alt_sql}'",
     );
     if ($cat && !empty($cat["id"])) {
+        if (!forum_cat_access_allowed($cat["permissions"] ?? "")) {
+            @header("HTTP/1.1 404 Not Found");
+            exit();
+        }
         $cat_filter = " AND t.cat_id = '" . intval($cat["id"]) . "'";
     }
 }
+
+$cat_filter .= " AND " . forum_cat_access_where("c");
 
 $site_name =
     !empty($config["home_url"])
@@ -71,6 +77,7 @@ if ($is_posts) {
                 t.alt_name AS topic_alt, u.name AS author
          FROM " . PREFIX . "_forum_posts p
          INNER JOIN " . PREFIX . "_forum_topics t ON t.id = p.topic_id
+         INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
          LEFT JOIN " . USERPREFIX . "_users u ON u.user_id = p.user_id
          WHERE p.is_deleted = 0 AND p.is_approved = 1
                AND t.is_deleted = 0 AND t.is_approved = 1 {$cat_filter}
@@ -85,6 +92,7 @@ if ($is_posts) {
         "SELECT t.id, t.title, t.alt_name, t.date, t.last_post_date, t.replies,
                 t.views, u.name AS author
          FROM " . PREFIX . "_forum_topics t
+         INNER JOIN " . PREFIX . "_forum_cats c ON c.id = t.cat_id
          LEFT JOIN " . USERPREFIX . "_users u ON u.user_id = t.user_id
          WHERE t.is_deleted = 0 AND t.is_approved = 1 {$cat_filter}
          ORDER BY t.last_post_date DESC

@@ -42,6 +42,11 @@ if (isset($_POST["cat_id"])) {
     );
 }
 
+if ($cat_row && !forum_cat_access_allowed($cat_row["permissions"] ?? "")) {
+    msgbox($lang['forum_access_denied'], $lang['forum_new_no_perm']);
+    return;
+}
+
 // Kategorileri listele (form için - Alt forum ağacı dahil)
 $categories = [];
 $db->query(
@@ -50,6 +55,9 @@ $db->query(
         "_forum_cats ORDER BY parent_id ASC, posi ASC",
 );
 while ($row = $db->get_row()) {
+    if (!forum_cat_access_allowed($row["permissions"] ?? "")) {
+        continue;
+    }
     $categories[] = $row;
 }
 
@@ -115,15 +123,12 @@ if (isset($_POST["submit_topic"])) {
             PREFIX .
             "_forum_cats WHERE id = '{$post_cat_id}'",
     );
-    if ($sel_cat["permissions"] != "all") {
-        $allowed = explode(",", $sel_cat["permissions"]);
-        if (!in_array($member_id["user_group"], $allowed)) {
-            msgbox(
-                $lang['forum_access_denied'],
-                $lang['forum_new_no_perm'],
-            );
-            return;
-        }
+    if ($sel_cat && !forum_cat_access_allowed($sel_cat["permissions"] ?? "")) {
+        msgbox(
+            $lang['forum_access_denied'],
+            $lang['forum_new_no_perm'],
+        );
+        return;
     }
 
     // Güvenlik filtreleme

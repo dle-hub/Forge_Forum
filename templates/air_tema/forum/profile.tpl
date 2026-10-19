@@ -23,16 +23,16 @@
             <div class="thread__actions">
                 [has-pm]
                 <a href="{pm_url}" onclick="DLESendPM('{user_name}'); return false;" class="soft-button">
-                    <i class="fa fa-comment" aria-hidden="true"></i> Mesaj Gönder
+                    <i class="fa fa-comment" aria-hidden="true"></i> {forum_ui_send_message}
                 </a>
                 [/has-pm]
                 [has-email]
                 <a href="{email_url}" class="soft-button">
-                    <i class="fa fa-envelope-o" aria-hidden="true"></i> E-Posta
+                    <i class="fa fa-envelope-o" aria-hidden="true"></i> {forum_ui_email}
                 </a>
                 [/has-email]
                 <a href="{http_home_url}index.php?do=forum&action=search&q={user_name}&in=posts" class="soft-button">
-                    <i class="fa fa-search" aria-hidden="true"></i> Gönderileri Bul
+                    <i class="fa fa-search" aria-hidden="true"></i> {forum_ui_find_posts_btn}
                 </a>
                 [can-follow]
                 <button type="button" id="forum-follow-btn" class="soft-button" data-active="{follow_active}" onclick="forumToggleFollow({user_id}); return false;">
@@ -42,27 +42,27 @@
             </div>
 
             <div style="display:flex;gap:var(--sp-4);margin-top:var(--sp-3);font-size:var(--fs-sm);font-weight:600">
-                <span><i class="fa fa-users" aria-hidden="true" style="color:var(--accent)"></i> <b id="forum-followers">{followers}</b> Takipçi</span>
-                <span><i class="fa fa-user-plus" aria-hidden="true" style="color:var(--accent)"></i> <b>{following}</b> Takip</span>
+                <span><i class="fa fa-users" aria-hidden="true" style="color:var(--accent)"></i> <b id="forum-followers">{followers}</b> {forum_ui_followers}</span>
+                <span><i class="fa fa-user-plus" aria-hidden="true" style="color:var(--accent)"></i> <b>{following}</b> {forum_ui_following}</span>
             </div>
         </div>
 
         <!-- İstatistik bandı -->
         <div class="stats-cards" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-top:var(--sp-4)">
             <div class="stats-card">
-                <span class="stats-card__label"><i class="fa fa-trophy" aria-hidden="true"></i> Puan</span>
+                <span class="stats-card__label"><i class="fa fa-trophy" aria-hidden="true"></i> {forum_ui_points}</span>
                 <span class="stats-card__value">{points}</span>
             </div>
             <div class="stats-card">
-                <span class="stats-card__label"><i class="fa fa-folder-o" aria-hidden="true"></i> Konu</span>
+                <span class="stats-card__label"><i class="fa fa-folder-o" aria-hidden="true"></i> {forum_ui_topics}</span>
                 <span class="stats-card__value">{topic_count}</span>
             </div>
             <div class="stats-card">
-                <span class="stats-card__label"><i class="fa fa-comments-o" aria-hidden="true"></i> Mesaj</span>
+                <span class="stats-card__label"><i class="fa fa-comments-o" aria-hidden="true"></i> {forum_ui_posts}</span>
                 <span class="stats-card__value">{post_count}</span>
             </div>
             <div class="stats-card">
-                <span class="stats-card__label"><i class="fa fa-calendar" aria-hidden="true"></i> Kayıt</span>
+                <span class="stats-card__label"><i class="fa fa-calendar" aria-hidden="true"></i> {forum_ui_joined}</span>
                 <span class="stats-card__value" style="font-size:var(--fs-sm)">{reg_date}</span>
             </div>
         </div>
@@ -70,7 +70,7 @@
         <!-- Son görülme -->
         <div class="result-card" style="margin-top:var(--sp-4);display:flex;align-items:center;gap:var(--sp-2)">
             <i class="fa fa-clock-o" aria-hidden="true" style="color:var(--muted)"></i>
-            <span class="meta-item">Son görülme: <strong>{last_date}</strong></span>
+            <span class="meta-item">{forum_ui_last_seen}: <strong>{last_date}</strong></span>
         </div>
 
         <!-- Son konular / son mesajlar -->
@@ -78,14 +78,14 @@
             <div class="result-card">
                 <div class="result-card__top">
                     <i class="fa fa-file-text-o" aria-hidden="true"></i>
-                    <span class="result-card__title" style="margin:0;font-size:var(--fs-ui)">Son Açılan Konular</span>
+                    <span class="result-card__title" style="margin:0;font-size:var(--fs-ui)">{forum_ui_recent_topics}</span>
                 </div>
                 <div style="margin-top:var(--sp-3)">{recent_topics}</div>
             </div>
             <div class="result-card">
                 <div class="result-card__top">
                     <i class="fa fa-comments-o" aria-hidden="true"></i>
-                    <span class="result-card__title" style="margin:0;font-size:var(--fs-ui)">Son Mesajlar</span>
+                    <span class="result-card__title" style="margin:0;font-size:var(--fs-ui)">{forum_ui_recent_posts}</span>
                 </div>
                 <div style="margin-top:var(--sp-3)">{recent_posts}</div>
             </div>
@@ -111,6 +111,6 @@ function forumToggleFollow(targetId) {
         } else if (r && r.message) {
             alert(r.message);
         }
-    }, 'json').fail(function () { alert('Bağlantı hatası.'); });
+    }, 'json').fail(function () { alert('{forum_ui_js_connection}'); });
 }
 </script>

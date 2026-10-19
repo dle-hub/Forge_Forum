@@ -9,7 +9,7 @@
 
     <section class="forum-category-block">
         <header class="forum-cat-bar forum-cat-header">
-            <h2 class="forum-cat-title"><i class="fa fa-signal" aria-hidden="true"></i> Çevrimiçi Üyeler</h2>
+            <h2 class="forum-cat-title"><i class="fa fa-signal" aria-hidden="true"></i> {forum_ui_online_members}</h2>
             <span class="forum-cat-toggle" role="button" tabindex="0"><i class="fa fa-minus" aria-hidden="true"></i></span>
         </header>
         <div class="forum-rows">
